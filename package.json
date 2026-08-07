@@ -1,7 +1,7 @@
 {
   "name": "mcp-authority-boundary",
   "version": "1.0.0",
-  "description": "A reproducible research artifact: machine-checked Cedar authorization at the MCP boundary holds even when the LLM is adversarial.",
+  "description": "Research artifact separating three properties of agent authorization: complete mediation, authorization-execution binding, and policy adequacy. Cedar-enforced MCP tool boundary, adversarially falsified and repaired.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -25,5 +25,16 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0"
-  }
+  },
+  "keywords": [
+    "mcp",
+    "cedar",
+    "authorization",
+    "llm-agents",
+    "prompt-injection",
+    "security-research",
+    "research-artifact"
+  ],
+  "author": "Warren",
+  "private": true
 }

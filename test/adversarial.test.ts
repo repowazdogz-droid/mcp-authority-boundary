@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type * as cedar from '@cedar-policy/cedar-wasm/nodejs';
 import { harness } from './helper.js';
 import { EnforcementPoint } from '../src/enforce.js';
@@ -166,7 +168,7 @@ const B_LAUNDERED = session('sess-B-laundered', {
 
 function pepWith(extra: cedar.EntityJson[], sessionId: string, clock: number) {
   const policy = loadPolicy('v1');
-  const path = `/tmp/mab-adv-${sessionId}-${clock}.jsonl`;
+  const path = join(tmpdir(), `mab-adv-${sessionId}-${clock}.jsonl`);
   try {
     unlinkSync(path);
   } catch {
@@ -385,7 +387,7 @@ test('A7 legitimate actions are denied because the resource is not pre-registere
 // ---------------------------------------------------------------------------
 
 test('A8 the A1 divergence can no longer be recorded, so there is no such ledger to replay', async () => {
-  const path = '/tmp/mab-adv-replay.jsonl';
+  const path = join(tmpdir(), 'mab-adv-replay.jsonl');
   try {
     unlinkSync(path);
   } catch {
