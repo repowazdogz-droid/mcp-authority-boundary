@@ -32,25 +32,40 @@ forged authority fields stripped              4
 tool executions                               7
 tool-action allow decisions                   7
 mediation invariant                          HOLDS
-same calls, authorization removed            18 executed
-tests                                        66 passed
+same calls, authorization removed            18 would execute
+tests                                       100 passed
 ```
 
-Replay, over the same ledger:
+Replay, over the same ledger, in four separately-reported stages. They are never collapsed
+into a single verdict, because the adversarial audit showed that a single `VERIFIED` hid an
+authorization/execution divergence:
 
 ```
-entries          26
-chain integrity  intact
-re-decided       26 requests against their pinned policy version
-mediation        7 executions / 7 tool-action allow decisions
-verdict          VERIFIED
+stage                checked  n/a  failures  verdict   establishes
+chain-integrity           26    0         0  PASS      the file has not been edited or reordered
+policy-replay             26    0         0  PASS      the decision is reproducible from the recorded
+                                                       request (shares Cedar build + classifier)
+auth-exec-binding         24    2         0  PASS      the recorded request is what the recorded
+                                                       operation derives (shares the derivation fn)
+effect-consistency         7   19         0  PASS      the world state observed after execution
+                                                       matches the authorized operation
+verdict  ALL STAGES PASS
 ```
+
+Negative controls, run because a stage that has only ever passed is uncharacterised. Each
+tamper turns exactly one substantive stage red and leaves the other green, which is what shows
+these are four checks and not one check reported four times:
+
+| Tamper | chain | policy-replay | auth-exec | effect |
+|---|---|---|---|---|
+| flip one `observedEffect.byteLen` | FAIL | PASS | PASS | **FAIL** |
+| flip one recorded `operation.byteLen` | FAIL | PASS | **FAIL** | PASS |
 
 The ledger is byte-identical across runs. Both the logical clock and the wall clock are
 pinned, so the hash chain reproduces exactly:
 
 ```
-sha256(evidence/ledger.jsonl) = 2700af5ed2dd2567a3555551d9dc506d3fe18439cc153ad55010d2ab1a2c8db1
+sha256(evidence/ledger.jsonl) = 92aeae05964d0e39d2052e2c8bfb101189792953d104cef88642775e451ec464
 ```
 
 ## What frame these numbers were measured in

@@ -29,6 +29,7 @@ export class HostileRawClient {
         ...(process.env as Record<string, string>),
         MCP_SESSION_ID: this.env.sessionId,
         MCP_CLOCK: String(this.env.clock),
+        MCP_CLOCK_STEP: String(this.env.clockStep ?? 0),
         MCP_LEDGER: this.env.ledgerPath,
         MCP_POLICY_OVERLAYS: (this.env.overlays ?? []).join(','),
         MCP_POLICY_VERSION: this.env.policyVersion ?? (this.env.overlays?.length ? 'v2' : 'v1'),

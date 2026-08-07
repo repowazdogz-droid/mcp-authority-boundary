@@ -4,11 +4,27 @@
 even when the language model behaves adversarially?
 
 **What this artifact shows:** 24 scenarios produce 26 recorded authorization decisions, 8
-allow and 18 deny. Throughout, the model is fully conceded to the attacker: it emits
-exactly the call the attacker wants, with no resistance. No tool executed without a
-matching Cedar `allow` under the pinned policy version, and every decision re-derives when
-an independent verifier replays the log. The same attacker-chosen calls, run with the
-authorization layer taken out of the path, execute 18 out of 18.
+allow and 18 deny. Throughout, the model is fully conceded to the attacker: it emits exactly
+the call the attacker wants, with no resistance. No tool executed without a matching Cedar
+`allow`, and every execution consumed the same canonical operation Cedar authorized. The same
+attacker-chosen calls would all execute with the authorization layer removed.
+
+The artifact was adversarially audited against itself, the audit falsified the original claim,
+and the repair is recorded. Read `docs/AUDIT.md` and `docs/REPAIR.md` before citing anything
+here.
+
+### Four claims, kept separate
+
+The single biggest way to misread this repository is to let one of these imply another.
+
+| | Claim | Status |
+|---|---|---|
+| **A** | **Structural mediation.** No mediated tool executes without an `allow`. | **SUPPORTED.** Structural (tools require a PDP-minted grant), runtime-checked, and checked over the ledger. |
+| **B** | **Authorization binding.** Execution consumes the canonical operation Cedar authorized. | **SUPPORTED.** One validated frozen `ResolvedOperation`; the Cedar request is derived from it and the grant is bound to its digest. This claim did **not** hold before the audit. |
+| **C** | **Policy adequacy.** The Cedar policy expresses the intended authority. | **NOT CLAIMED.** Finding A2 (delegation ancestry) and A6 (destructive SQL authorized as read-only) are live counterexamples, kept deliberately. |
+| **D** | **Effect verification.** The observed fixture effect matches the authorized operation. | **SUPPORTED FOR THE FIXTURE TOOLS**, and only those. Effects are simulated. |
+
+A and B and D holding says nothing about C. That is the point of listing them apart.
 
 It is a demonstration over an authored scenario set, not a proof. What that does and does
 not license is stated precisely in [docs/EVIDENCE.md](docs/EVIDENCE.md), and the cases
@@ -24,8 +40,8 @@ npm install
 npm run verify
 ```
 
-`verify` runs the scenarios, replays the resulting ledger through an independent verifier,
-and runs 66 tests. It needs Node 20.11+ and no API key, no network, and no other toolchain.
+`verify` runs the scenarios, replays the resulting ledger through a four-stage verifier, and
+runs 100 tests. It needs Node 20.11+ and no API key, no network, and no other toolchain.
 Everything is deterministic: the ledger is byte-identical across runs.
 
 Individually:
@@ -34,7 +50,7 @@ Individually:
 |---|---|
 | `npm run demo` | Runs all 24 scenarios, writes `evidence/` |
 | `npm run replay` | Re-decides every ledger entry against its pinned policy version |
-| `npm test` | 66 tests: authorization, fail-closed, mediation, attenuation, injection, policy update, replay integrity, regression |
+| `npm test` | 100 tests: authorization, fail-closed, mediation, attenuation, injection, policy update, replay integrity, regression, the 14 adversarial audit probes, and the 15-probe post-repair falsification sweep |
 | `npm run demo:live` | Optional. Replaces the scripted adversary with a real Claude model. Needs `ANTHROPIC_API_KEY`. |
 
 ---
@@ -55,17 +71,20 @@ Individually:
   +-------------------------------------------------+
   |  MCP server process                             |
   |                                                 |
-  |    resolve   ......  canonicalise the call       |
-  |       |              against the real world      |
+  |    resolve   ......  validate + canonicalise ONCE |
+  |       |              -> frozen ResolvedOperation  |
   |       v                                          |
-  |    Cedar PDP  ....  allow / deny + policy ids     |
-  |       |                                          |
-  |       |  ExecutionGrant (single-use)             |
+  |    Cedar PDP  ....  request DERIVED from the op   |
+  |       |              allow / deny + policy ids    |
+  |       |  grant bound to the operation's digest   |
+  |       v                                          |
+  |    tools  ........  execute exactly that op;      |
+  |       |              no access to raw args        |
+  |       v                                          |
+  |    observe  ......  read the world back and       |
+  |       |              compare to what was authorized|
   |       v                                          |
   |    ledger  .......  hash-chained, append-only     |
-  |       |                                          |
-  |       v                                          |
-  |    tools  ........  reachable ONLY with a grant   |
   +-------------------------------------------------+
 ```
 
@@ -163,7 +182,7 @@ src/                     14 files, ~2000 lines of code. No framework, no abstrac
   ledger.ts / replay.ts  hash chain and the independent verifier
   scenarios.ts           every scenario and its declared expected outcome
 docs/                    architecture, threat model, assumptions, limitations, evidence
-test/                    66 tests, ~640 lines
+test/                    100 tests: 71 core, 14 adversarial audit probes, 15 falsification probes
 scripts/screenshot.mjs   renders the run as evidence/screenshot.svg
 evidence/                generated by `npm run demo`
 ```
@@ -179,6 +198,8 @@ requests to it.
 - [Assumptions](docs/ASSUMPTIONS.md) — the trusted base, stated as premises
 - [Limitations](docs/LIMITATIONS.md) — read this before citing the artifact
 - [Evidence](docs/EVIDENCE.md) — the numbers, with their measurement frame
+- [Audit](docs/AUDIT.md) — the adversarial review that falsified the original claim
+- [Repair](docs/REPAIR.md) — what changed, and why it is principled rather than witness-excluding
 - [Attack matrix](docs/ATTACK_MATRIX.md) — scenario to policy mapping, and what is structurally out of reach
 
 ## Related work by the same author

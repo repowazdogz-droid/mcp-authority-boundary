@@ -1,11 +1,41 @@
 {
   "ledger": "evidence/ledger.jsonl",
   "entries": 26,
-  "chainIntact": true,
-  "reDecided": 26,
-  "executions": 7,
-  "allowDecisions": 7,
+  "stages": [
+    {
+      "stage": "chain-integrity",
+      "checked": 26,
+      "notApplicable": 0,
+      "failures": 0,
+      "verdict": "PASS",
+      "establishes": "the file has not been edited or reordered since it was written"
+    },
+    {
+      "stage": "policy-replay",
+      "checked": 26,
+      "notApplicable": 0,
+      "failures": 0,
+      "verdict": "PASS",
+      "establishes": "the recorded decision is reproducible from the recorded request (shares the Cedar build and classifier with the producer)"
+    },
+    {
+      "stage": "auth-exec-binding",
+      "checked": 24,
+      "notApplicable": 2,
+      "failures": 0,
+      "verdict": "PASS",
+      "establishes": "the recorded Cedar request is the one the recorded operation derives (shares the derivation function with the producer)"
+    },
+    {
+      "stage": "effect-consistency",
+      "checked": 7,
+      "notApplicable": 19,
+      "failures": 0,
+      "verdict": "PASS",
+      "establishes": "the effect observed in the world after execution matches the authorized operation"
+    }
+  ],
   "findings": [],
-  "verdict": "VERIFIED",
-  "scope": "Re-derivation uses the same Cedar engine that produced the original decisions. A match establishes that the ledger is a faithful, reproducible record of what the engine decided - not that the engine is correct, and not that the recorded events occurred."
+  "verdict": "ALL STAGES PASS",
+  "scope": "Stages 1-3 compare records to other records or re-derive them with code shared with the producer; they establish integrity and reproducibility, not correctness. Stage 4 is the only stage whose two sides come from different places, and even it compares a recorded world observation against a fresh derivation rather than re-observing the world, which is impossible after the fact."
 }

@@ -17,14 +17,14 @@ import type { EntityUid } from '../src/types.js';
  */
 export function harness(opts: {
   session: string;
-  clock: number;
+  /** Fixed clock, or a function when the test needs time to move. */
+  clock: number | (() => number);
   overlays?: string[];
   version?: string;
 }): { pep: EnforcementPoint; ledgerPath: string; restore: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'mab-'));
   const ledgerPath = join(dir, 'ledger.jsonl');
   const policy = loadPolicy(opts.version ?? 'v1', opts.overlays ?? []);
-  const entities = loadEntities();
   const ledger = new Ledger(ledgerPath);
   const session: EntityUid = { type: 'Mcp::Session', id: opts.session };
   const snapshot = snapshotDocuments();
@@ -32,10 +32,10 @@ export function harness(opts: {
   return {
     pep: new EnforcementPoint({
       policy,
-      entities,
+      entities: () => loadEntities(),
       ledger,
       session,
-      now: opts.clock,
+      now: typeof opts.clock === 'function' ? opts.clock : () => opts.clock as number,
       wallClock: '2026-08-07T00:00:00.000Z',
     }),
     ledgerPath,

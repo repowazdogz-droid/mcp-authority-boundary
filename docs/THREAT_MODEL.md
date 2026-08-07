@@ -35,10 +35,22 @@ the artifact entirely and no amount of policy will help.
 
 ## What is defended
 
-The property under test:
+The property under test, stated as the four separable claims the README lists:
 
-> No tool action executes unless Cedar, evaluating the request that describes the effect
-> that action would have, under the policy version recorded alongside it, returned `allow`.
+> **A (mediation).** No mediated tool action executes unless Cedar returned `allow` under the
+> policy version recorded alongside it.
+>
+> **B (binding).** The operation that executes is the same canonical, validated
+> `ResolvedOperation` the Cedar request was derived from, verified at execution time by digest.
+>
+> **D (effect).** For the fixture tools, the state transition observed after execution matches
+> the one the authorized operation specifies.
+>
+> **C (policy adequacy) is NOT claimed.** Findings A2 and A6 in `AUDIT.md` are live
+> counterexamples: the implementation is correct with respect to a policy that does not fully
+> express the intended authority.
+
+Claim B did not hold before the adversarial audit; `docs/REPAIR.md` records what changed.
 
 This holds regardless of what the model emits, because the model's output is data that a
 decision is made *about*, never an input the decision *trusts*. The scenarios exercise

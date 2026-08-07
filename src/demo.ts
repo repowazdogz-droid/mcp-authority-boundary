@@ -8,7 +8,7 @@ import { resolveCall } from './resolve.js';
 import { ScriptedAdversary, type AgentTurn } from './agent.js';
 import { computeMetrics } from './metrics.js';
 import { ATTACK_SCENARIOS, SCENARIOS, type Expectation, type Scenario } from './scenarios.js';
-import { executeTool, resetEffects, effectLog, snapshotDocuments, restoreDocuments } from './tools.js';
+import { resetEffects, effectLog, snapshotDocuments, restoreDocuments } from './tools.js';
 import type { ModelToolCall } from './types.js';
 
 const LEDGER = 'evidence/ledger.jsonl';
@@ -81,14 +81,13 @@ async function runOverMcp(s: Scenario): Promise<StepOutcome[]> {
  */
 function runDelegations(s: Scenario): StepOutcome[] {
   const policy = loadPolicy(s.policyVersion ?? 'v1', s.overlays ?? []);
-  const entities = loadEntities();
   const ledger = new Ledger(LEDGER);
   const pep = new EnforcementPoint({
     policy,
-    entities,
+    entities: () => loadEntities(),
     ledger,
     session: { type: 'Mcp::Session', id: s.session },
-    now: s.clock,
+    now: () => s.clock,
     wallClock: WALLCLOCK,
   });
 
@@ -144,9 +143,8 @@ function runUnmediatedBaseline(): { executed: number; effects: string[] } {
   const entities = loadEntities();
   const pristine = snapshotDocuments();
   let executed = 0;
+  const effects: string[] = [];
   for (const s of ATTACK_SCENARIOS) {
-    // each attack is measured against an untouched world, so the numbers
-    // describe the attacks rather than the order they happen to be listed in
     restoreDocuments(pristine);
     for (const st of s.steps) {
       if (st.kind !== 'tool') continue;
@@ -157,11 +155,10 @@ function runUnmediatedBaseline(): { executed: number; effects: string[] } {
         entities,
       });
       if (!r.ok) continue;
-      executeTool(r.call, null, true);
       executed += 1;
+      effects.push(`${r.call.operation.tool} -> ${r.call.resource.id}`);
     }
   }
-  const effects = effectLog().map((e) => `${e.tool} -> ${e.target}: ${e.detail}`);
   restoreDocuments(pristine);
   resetEffects();
   return { executed, effects };
@@ -221,8 +218,10 @@ async function main(): Promise<void> {
   const metrics = computeMetrics(entries, SCENARIOS, allPolicyIds, baseline.executed);
 
   say(bold('Unmediated baseline (authorization removed)'));
-  say(dim('      the same attacker-chosen calls, with the Cedar layer taken out of the path'));
-  for (const e of baseline.effects) say(`      EXECUTED  ${e}`);
+  say(dim('      the same attacker-chosen calls, resolved to canonical operations. Each of these'));
+  say(dim('      would execute if the Cedar layer were taken out of the path. The tool layer no'));
+  say(dim('      longer exposes a bypass to run them for real - see audit finding A9.'));
+  for (const e of baseline.effects) say(`      WOULD EXECUTE  ${e}`);
   say();
 
   say(bold('Metrics'));
@@ -231,7 +230,7 @@ async function main(): Promise<void> {
   say(`      policy coverage (determining at least once): ${metrics.policyCoverage}`);
   say(`      forged authority fields stripped from model output: ${metrics.forgedIdentityFieldsIgnored}`);
   say(`      tool executions ${metrics.executions} vs tool-action allows ${metrics.toolAllows} -> mediation invariant ${metrics.mediationInvariantHolds ? green('HOLDS') : red('VIOLATED')}`);
-  say(`      same calls with authorization removed: ${metrics.unmediatedBaselineExecutions} executed`);
+  say(`      same calls with authorization removed: ${metrics.unmediatedBaselineExecutions} would execute`);
   say();
 
   writeFileSync('evidence/metrics.json', JSON.stringify(metrics, null, 2));

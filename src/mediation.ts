@@ -1,31 +1,41 @@
-import type { EntityUid, ToolName } from './types.js';
+import { sha256Canonical } from './canonical.js';
+import type { EntityUid, ResolvedOperation } from './types.js';
 
 /**
  * Complete mediation, made structural.
  *
  * A tool in this artifact cannot be invoked with a plain argument list. It
- * requires an ExecutionGrant, and an ExecutionGrant can only be minted by the
- * policy decision point after Cedar returned `allow`. There is no code path from
- * "the model asked for a tool" to "the tool ran" that does not pass through
- * `mintGrant`, and `mintGrant` is not exported from the package entry point.
+ * requires an ExecutionGrant, and an ExecutionGrant is bound to the digest of
+ * the exact canonical operation the PDP authorized. `consumeGrant` recomputes
+ * that digest from the operation being executed and refuses on any mismatch, so
+ * "the thing that runs is the thing that was authorized" is checked at the
+ * moment of execution rather than assumed from the call site.
  *
- * This is a construction argument about this codebase, not a proof about MCP
- * servers in general. test/mediation.test.ts exercises the three ways one would
- * try to get around it: forging a grant, reusing a grant, and calling the tool
- * layer directly.
+ * Two weaknesses the adversarial audit exposed are closed here:
+ *
+ *   A5 - the grant carried a resource that nothing ever checked. The binding is
+ *        now the operation digest, and it is verified on every execution.
+ *   A9 - `executeTool` took an `unsafe_bypassAuthorization` flag, so complete
+ *        mediation was a property of who called it. The flag is gone.
+ *
+ * A third weakness the audit did NOT catch: `mintGrant` used to be a plain
+ * export, so any module could mint a grant and the guarantee rested on nobody
+ * doing so. Minting is now a one-shot capability - the first caller of
+ * `claimMinter()` takes it and every later caller throws - and pdp.ts claims it
+ * at module load. There is no second minter to obtain.
  */
 const PDP_ONLY = Symbol('minted-by-pdp');
 
 export class ExecutionGrant {
   readonly requestId: string;
-  readonly tool: ToolName;
+  readonly operationSha256: string;
   readonly resource: EntityUid;
   readonly policyVersionSha: string;
 
   constructor(
     guard: symbol,
     requestId: string,
-    tool: ToolName,
+    operationSha256: string,
     resource: EntityUid,
     policyVersionSha: string,
   ) {
@@ -35,47 +45,70 @@ export class ExecutionGrant {
       );
     }
     this.requestId = requestId;
-    this.tool = tool;
+    this.operationSha256 = operationSha256;
     this.resource = resource;
     this.policyVersionSha = policyVersionSha;
   }
 }
 
-/** Grants that this process actually issued. A forged object is not in here. */
+/** Grants this process actually issued. A forged object is not in here. */
 const issued = new WeakSet<ExecutionGrant>();
-/**
- * Grants already spent. One allow authorises exactly one execution.
- *
- * Keyed on the grant OBJECT, not on its request id. The first version used a
- * Set of id strings, which conflated two different things: request ids are for
- * correlating a decision with its ledger entry, and are only unique within one
- * ledger, so two independent enforcement points in the same process could
- * legitimately mint `sess-x@0#0` twice and the second execution would be
- * refused as a replay. Single use is a property of the capability, so the
- * capability is what gets tracked.
- */
+/** Grants already spent, keyed on the capability object rather than on a name. */
 const spent = new WeakSet<ExecutionGrant>();
 let spentTotal = 0;
 
-export function mintGrant(
+export type Minter = (
   requestId: string,
-  tool: ToolName,
+  operationSha256: string,
+  resource: EntityUid,
+  policyVersionSha: string,
+) => ExecutionGrant;
+
+function mint(
+  requestId: string,
+  operationSha256: string,
   resource: EntityUid,
   policyVersionSha: string,
 ): ExecutionGrant {
-  const g = new ExecutionGrant(PDP_ONLY, requestId, tool, resource, policyVersionSha);
+  const g = new ExecutionGrant(PDP_ONLY, requestId, operationSha256, resource, policyVersionSha);
   issued.add(g);
   return g;
 }
 
-/** Called by the tool layer before it does anything. Throws rather than returns. */
-export function consumeGrant(grant: unknown, tool: ToolName): ExecutionGrant {
+let minterClaimed = false;
+
+/**
+ * Hand out the minting capability exactly once.
+ *
+ * pdp.ts calls this at module load. Anything else that tries gets an exception,
+ * so a second minting path cannot be added by importing this module - it has to
+ * be added by editing this file, which is a reviewable act rather than a silent one.
+ */
+export function claimMinter(): Minter {
+  if (minterClaimed) {
+    throw new Error('the grant-minting capability has already been claimed by the PDP');
+  }
+  minterClaimed = true;
+  return mint;
+}
+
+/**
+ * Called by the tool layer before it does anything. Throws rather than returns.
+ *
+ * The digest comparison is what makes the authorization binding real: an
+ * operation that differs from the authorized one in any field - a byte of
+ * content, a character of path, a recipient - produces a different digest and
+ * is refused.
+ */
+export function consumeGrant(grant: unknown, operation: ResolvedOperation): ExecutionGrant {
   if (!(grant instanceof ExecutionGrant) || !issued.has(grant)) {
     throw new Error('refusing to execute: no grant issued by the policy decision point');
   }
-  if (grant.tool !== tool) {
+  const digest = sha256Canonical(operation);
+  if (grant.operationSha256 !== digest) {
     throw new Error(
-      `refusing to execute: grant authorises ${grant.tool}, not ${tool}`,
+      `refusing to execute: grant authorises operation ${grant.operationSha256.slice(0, 12)}, ` +
+        `but the operation presented digests to ${digest.slice(0, 12)}`,
     );
   }
   if (spent.has(grant)) {

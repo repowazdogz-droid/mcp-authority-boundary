@@ -1,42 +1,76 @@
 import type * as cedar from '@cedar-policy/cedar-wasm/nodejs';
 import { Pdp, denyUnresolvable } from './pdp.js';
 import { resolveCall } from './resolve.js';
-import { executeTool, type ToolResult } from './tools.js';
+import { executeTool, expectedEffectOf, observeEffect, effectsMatch, type ToolResult } from './tools.js';
 import type { EntityStore, LoadedPolicy } from './policy.js';
 import { engineVersions } from './policy.js';
 import type { Ledger } from './ledger.js';
-import type { CedarContext, Decision, EntityUid, LedgerEntry, ModelToolCall } from './types.js';
+import type {
+  CedarContext,
+  Decision,
+  EffectFingerprint,
+  EntityUid,
+  LedgerEntry,
+  ModelToolCall,
+  ResolvedOperation,
+} from './types.js';
 
 /**
  * The enforcement point: the single place a tool call can become a tool
  * execution.
  *
- * Order matters and is fixed: resolve the call against the real world, decide,
- * record, and only then - if and only if Cedar allowed it - execute. The ledger
- * entry is written for denials too, which is what makes the "no execution
- * without a matching allow" invariant checkable over the log rather than merely
- * asserted in prose.
+ * The order is fixed and each step consumes only the output of the previous one:
+ *
+ *   raw call -> validate and canonicalise ONCE -> frozen ResolvedOperation
+ *            -> Cedar request DERIVED from the operation -> decide
+ *            -> grant bound to the operation's digest
+ *            -> execute exactly that operation
+ *            -> observe the world and compare against what was authorized
+ *
+ * The tool layer never sees the raw arguments. That is the structural answer to
+ * audit finding A1, where the resolver measured one payload and the tool wrote
+ * a different one because both read `call.args` independently.
  */
 export interface EnforcementConfig {
   policy: LoadedPolicy;
-  entities: EntityStore;
+  /**
+   * Read afresh for every decision.
+   *
+   * Audit finding A4: the store used to be loaded once at server start, so
+   * flipping `revoked` on disk never reached a running process while the
+   * documentation claimed revocation was immediate. A function, called per
+   * decision, makes the documented behaviour the actual behaviour.
+   */
+  entities: () => EntityStore;
   ledger: Ledger;
   session: EntityUid;
-  /** Logical clock. Injected by the host at session setup; not model-influenceable. */
-  now: number;
-  /** Pinned so the hash chain is byte-reproducible across runs. */
+  /**
+   * Read afresh for every decision.
+   *
+   * Audit finding A3: this used to be a fixed number captured at construction,
+   * so expiry was evaluated against session-start time and never fired in a live
+   * session. Deployments inject a real clock; the demo injects a deterministic
+   * one so the ledger stays byte-reproducible.
+   */
+  now: () => number;
   wallClock: string;
 }
 
 interface RecordInput {
   requestId: string;
   raw: ModelToolCall;
+  logicalTime: number;
+  entitiesSha256: string;
+  operation: ResolvedOperation | null;
+  operationSha256: string | null;
   action: EntityUid;
   resource: EntityUid;
   context: CedarContext | { now: number };
   ignoredModelFields: string[];
   decision: Decision;
   result: ToolResult | null;
+  authorizedEffect: EffectFingerprint | null;
+  observedEffect: EffectFingerprint | null;
   extraEntities?: unknown[];
 }
 
@@ -45,23 +79,12 @@ const UNRESOLVED: EntityUid = { type: '<unresolved>', id: '<unresolved>' };
 export class EnforcementPoint {
   private readonly pdp: Pdp;
   private counter = 0;
-  /**
-   * Where this enforcement point started in the ledger.
-   *
-   * Request ids were originally `<session>#<counter>` with the counter local to
-   * the process. Each scenario spawns a fresh server, so the counter restarted
-   * and ids collided across scenarios - the in-process single-use grant check
-   * could not see it, because the collisions were in different processes. The
-   * replay verifier's duplicate-id check found it. Anchoring on the ledger
-   * position makes ids unique across the whole log while staying deterministic,
-   * so the hash chain remains byte-reproducible.
-   */
   private readonly origin: number;
   /** Turn-level taint. Coarse by design; see docs/LIMITATIONS.md, L4. */
   private sourceTrust: 'user' | 'tool_output' = 'user';
 
   constructor(private readonly cfg: EnforcementConfig) {
-    this.pdp = new Pdp(cfg.policy, cfg.entities);
+    this.pdp = new Pdp(cfg.policy);
     this.origin = cfg.ledger.nextSeq();
   }
 
@@ -76,32 +99,40 @@ export class EnforcementPoint {
 
   handle(raw: ModelToolCall): { entry: LedgerEntry; result: ToolResult | null } {
     const requestId = this.newRequestId();
+    // both read once per decision, and recorded with the decision
+    const now = this.cfg.now();
+    const entities = this.cfg.entities();
 
     const resolution = resolveCall(raw, {
       requestId,
-      now: this.cfg.now,
+      now,
       sourceTrust: this.sourceTrust,
-      entities: this.cfg.entities,
+      entities,
     });
 
     if (!resolution.ok) {
-      const decision = denyUnresolvable(requestId, resolution.reason);
       return {
         entry: this.record({
           requestId,
           raw,
+          logicalTime: now,
+          entitiesSha256: entities.sha256,
+          operation: null,
+          operationSha256: null,
           action: UNRESOLVED,
           resource: UNRESOLVED,
           context: {
-            now: this.cfg.now,
+            now,
             sourceTrust: this.sourceTrust,
             byteLen: 0,
             recipientDomain: '',
             requestId,
           },
           ignoredModelFields: resolution.ignoredModelFields,
-          decision,
+          decision: denyUnresolvable(requestId, resolution.reason),
           result: null,
+          authorizedEffect: null,
+          observedEffect: null,
         }),
         result: null,
       };
@@ -114,12 +145,18 @@ export class EnforcementPoint {
       action: call.action,
       resource: call.resource,
       context: call.context,
-      tool: call.tool,
+      entities,
+      operation: call.operation,
+      operationSha256: call.operationSha256,
     });
 
     const base = {
       requestId,
       raw,
+      logicalTime: now,
+      entitiesSha256: entities.sha256,
+      operation: call.operation,
+      operationSha256: call.operationSha256,
       action: call.action,
       resource: call.resource,
       context: call.context,
@@ -127,48 +164,87 @@ export class EnforcementPoint {
     };
 
     if (outcome.decision.decision === 'deny') {
-      return { entry: this.record({ ...base, decision: outcome.decision, result: null }), result: null };
+      return {
+        entry: this.record({
+          ...base,
+          decision: outcome.decision,
+          result: null,
+          authorizedEffect: null,
+          observedEffect: null,
+        }),
+        result: null,
+      };
     }
 
-    const result = executeTool(call, outcome.grant);
+    // What the authorized operation says should happen, computed BEFORE the tool
+    // runs and from the operation alone.
+    const authorizedEffect = expectedEffectOf(call.operation);
+
+    const result = executeTool(call.operation, outcome.grant);
+
+    // What actually happened, read back out of the fixture world.
+    const observedEffect = observeEffect(call.operation);
+
+    if (!effectsMatch(authorizedEffect, observedEffect)) {
+      // Not reachable by any input found so far. It is a throw rather than a
+      // logged warning because an execution that diverged from its authorization
+      // is precisely the condition this artifact exists to prevent, and
+      // continuing would leave the world in a state nothing authorized.
+      throw new Error(
+        `execution diverged from authorization for ${requestId}: ` +
+          `authorized ${JSON.stringify(authorizedEffect)}, observed ${JSON.stringify(observedEffect)}`,
+      );
+    }
+
     if (result.carriesResourceContent) this.sourceTrust = 'tool_output';
-    return { entry: this.record({ ...base, decision: outcome.decision, result }), result };
+
+    return {
+      entry: this.record({ ...base, decision: outcome.decision, result, authorizedEffect, observedEffect }),
+      result,
+    };
   }
 
   /**
    * Authorize the minting of a delegated session.
    *
    * The proposed child is passed to Cedar as a transient entity and is admitted
-   * to the world only if `permit-delegate-attenuated` allows it. Running this
-   * through the same engine and the same ledger as tool calls is what makes the
-   * attenuation argument inductive: every link in a delegation chain was
-   * checked by the policy set that the chain's final request is decided under.
+   * only if `permit-delegate-attenuated` allows it. Running this through the same
+   * engine and the same ledger as tool calls is what makes the attenuation
+   * argument inductive rather than a convention.
    */
   handleDelegation(child: cedar.EntityJson): LedgerEntry {
     const requestId = this.newRequestId();
+    const now = this.cfg.now();
+    const entities = this.cfg.entities();
     const uid = child.uid as { type: string; id: string };
     const resource: EntityUid = { type: uid.type, id: uid.id };
     const action: EntityUid = { type: 'Mcp::Action', id: 'delegate' };
-    const context = { now: this.cfg.now };
 
     const decision = this.pdp.decide({
       requestId,
       principal: this.cfg.session,
       action,
       resource,
-      context,
+      context: { now },
+      entities,
       extraEntities: [child],
     });
 
     return this.record({
       requestId,
       raw: { tool: 'delegate', args: { proposedSession: uid.id, attributes: child.attrs } },
+      logicalTime: now,
+      entitiesSha256: entities.sha256,
+      operation: null,
+      operationSha256: null,
       action,
       resource,
-      context,
+      context: { now },
       ignoredModelFields: [],
       decision,
       result: null,
+      authorizedEffect: null,
+      observedEffect: null,
       extraEntities: [child],
     });
   }
@@ -176,12 +252,14 @@ export class EnforcementPoint {
   private record(i: RecordInput): LedgerEntry {
     return this.cfg.ledger.append({
       requestId: i.requestId,
-      logicalTime: this.cfg.now,
+      logicalTime: i.logicalTime,
       wallClock: this.cfg.wallClock,
       engine: engineVersions(),
       policyVersion: this.cfg.policy.version,
-      entitiesSha256: this.cfg.entities.sha256,
+      entitiesSha256: i.entitiesSha256,
       modelToolCall: i.raw,
+      operation: i.operation,
+      operationSha256: i.operationSha256,
       cedarRequest: {
         principal: this.cfg.session,
         action: i.action,
@@ -192,6 +270,8 @@ export class EnforcementPoint {
       ignoredModelFields: i.ignoredModelFields,
       decision: i.decision,
       toolResult: i.result ? { ok: i.result.ok, summary: i.result.summary } : null,
+      authorizedEffect: i.authorizedEffect,
+      observedEffect: i.observedEffect,
     });
   }
 }

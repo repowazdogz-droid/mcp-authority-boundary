@@ -34,16 +34,29 @@ working an expected outcome out by hand, not by any mechanism in this repository
 
 A policy that is wrong will be enforced faithfully.
 
-## L3. The correspondence layer is the weak point, and its SQL path is a regex
+## L3. The correspondence layer HAD known defects; some are closed, one remains
+
+**Read `docs/AUDIT.md` and `docs/REPAIR.md` before relying on this section.** An adversarial
+audit of this artifact falsified its original central claim by exhibiting a working
+authorization/execution divergence (A1), and found two further correspondence defects (A3, A4).
+All three are closed and are pinned by before/after regression tests.
+
+What is closed: type confusion between the measuring path and the executing path, because
+there is now one validated frozen operation and the tool layer has no access to raw arguments;
+a frozen clock, because time is read per decision; a cached entity store, because it is read
+per decision.
+
+What remains, unchanged by the repair:
 
 Cedar can only be as correct as the request it is handed. `resolve.ts` is the code that
 turns a tool call into that request, and it is ordinary, unverified TypeScript.
 
-The SQL resolver is the clearest instance: it extracts table names with a regular
-expression, which is not a parser. It refuses anything it cannot bind to exactly one known
-table, so its failure mode is false denials rather than false allows, but a query it
-mis-parses into a *plausible* single table would be authorised against the wrong resource
-and every downstream check, replay included, would agree with it.
+The SQL resolver extracts table names with a regular expression, which is not a parser. It
+refuses anything it cannot bind to exactly one known table, so its failure mode is false
+denials rather than false allows, but a query it mis-parses into a *plausible* single table
+would be authorised against the wrong resource, and every downstream check including replay
+would agree with it. The statement class is now recorded alongside the table, which makes a
+mis-classification visible in the evidence without preventing it.
 
 Path canonicalisation has the same shape and is better tested, but it is `posix.normalize`
 plus a prefix check, not a filesystem-level guarantee. It knows nothing about symlinks,
@@ -64,6 +77,12 @@ Real information-flow control would track provenance through argument constructi
 a substantially harder problem and this is not an approximation of it.
 
 ## L5. The security property is demonstrated, not proven
+
+**Do not read claims A, B and D as implying C.** The README lists four claims deliberately
+apart: mediation, authorization binding, policy adequacy, and effect verification. This
+artifact supports A, B and D and explicitly does not support C, and keeps two live
+counterexamples to C (findings A2 and A6) rather than closing them, because an artifact that
+demonstrated only successes would be less useful.
 
 The property "no sequence of prompts can cause execution of a tool action that Cedar denies"
 is universally quantified over an infinite set. It is not established by running 24
@@ -100,22 +119,25 @@ Two consequences worth stating separately:
   ledger that verifies cleanly. The chain gives integrity and ordering, not completeness.
   There is a test that asserts exactly this, deliberately, so the gap is visible rather than
   implied.
-- **Replay shares the engine.** Re-deciding uses the same Cedar build that made the original
-  decision, so a fault in Cedar would reproduce identically and be reported as a match.
-  Replay establishes that the record is a faithful, reproducible account of what the engine
-  decided. It cannot establish that the engine was right.
+- **Replay shares the engine, and three of its four stages share more.** Stage 2 shares the
+  Cedar build and the classifier; stage 3 shares the request-derivation function; only stage 4
+  compares two things derived by different routes, and even it compares a recorded world
+  observation against a fresh derivation rather than re-observing the world, which is
+  impossible once the process is gone. The stage table in `EVIDENCE.md` states what each buys.
 
 The check in replay that carries real weight is the one that discards the recorded verdict
 entirely and re-derives it from the recorded request plus the policy files on disk, which
 the verifier holds independently of the log. That is a genuine reconstruction. It is not an
 independent oracle.
 
-## L7. Effects are simulated
+## L7. Effects are simulated, and the effect check inherits that
 
-No real shell command runs, no real mail is sent, no real database is queried. The artifact
-shows that a *request* was refused. That a refused request implies a prevented side effect
-depends on the tool implementations honouring the grant they were given, which is true here
-by construction and would need separate assurance anywhere else.
+No real shell command runs, no real mail is sent, no real database is queried. The
+effect-consistency stage reads back an in-process fixture world, so claim D is scoped to
+"the observed fixture state transition matches the authorized operation" and no further. A
+real filesystem brings symlinks, races, partial writes and permissions, none of which this
+fixture has. Whether a real tool would honour the operation it was handed is exactly the
+question the fixture cannot answer.
 
 ## L8. One policy set, one entity store, one author
 

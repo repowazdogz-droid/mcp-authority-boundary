@@ -1,5 +1,13 @@
 # Adversarial audit
 
+> **STATUS: findings A1, A3, A4, A5 and A9 are CLOSED; A2 and A7 remain OPEN; A6 is
+> MITIGATED (recorded, not gated). See `docs/REPAIR.md`.**
+>
+> Nothing below has been edited, softened, or removed. The exploits described here worked
+> exactly as written at the time of the audit, and each is preserved as a before/after
+> regression test in `test/adversarial.test.ts`. The historical record is the point: an
+> artifact that shows only its final state hides how it got there.
+
 Date: 2026-08-07. Auditor: the artifact's author, which is a limitation of this audit and
 is recorded as such in the final section rather than as a caveat.
 

@@ -14,12 +14,14 @@ const CTX: CedarContext = {
 };
 
 function pdp(): Pdp {
-  return new Pdp(loadPolicy('v1'), loadEntities());
+  return new Pdp(loadPolicy('v1'));
 }
+const ents = () => loadEntities();
 
 test('a request that does not typecheck against the schema is denied, not passed through', () => {
   const d = pdp().decide({
     requestId: 'fc#0',
+    entities: ents(),
     principal: { type: 'Mcp::Session', id: 'sess-alice-root' },
     action: { type: 'Mcp::Action', id: 'noSuchAction' },
     resource: { type: 'Mcp::Document', id: 'corp/public/roadmap.md' },
@@ -33,6 +35,7 @@ test('a request that does not typecheck against the schema is denied, not passed
 test('a request naming an entity that does not exist is denied, and is not reported as a policy decision', () => {
   const d = pdp().decide({
     requestId: 'fc#1',
+    entities: ents(),
     principal: { type: 'Mcp::Session', id: 'sess-does-not-exist' },
     action: { type: 'Mcp::Action', id: 'readDocument' },
     resource: { type: 'Mcp::Document', id: 'corp/public/roadmap.md' },
@@ -49,6 +52,7 @@ test('a request naming an entity that does not exist is denied, and is not repor
 test('a malformed context is denied rather than defaulted', () => {
   const d = pdp().decide({
     requestId: 'fc#2',
+    entities: ents(),
     principal: { type: 'Mcp::Session', id: 'sess-alice-root' },
     action: { type: 'Mcp::Action', id: 'readDocument' },
     resource: { type: 'Mcp::Document', id: 'corp/public/roadmap.md' },

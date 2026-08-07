@@ -10,7 +10,7 @@ npm run verify
 ```
 
 Node 20.11 or newer. No API key, no network after `npm install`, no other toolchain. You
-should see 24 scenarios, a replay verdict of `VERIFIED`, and 66 passing tests.
+should see 24 scenarios, four replay stages all reporting PASS, and 100 passing tests.
 
 ## 1. Read the policy set first (5 minutes)
 
@@ -56,9 +56,11 @@ The four to look at:
 npm run replay
 ```
 
-This discards every recorded verdict and re-derives it from the recorded request plus the
-policy files on disk, then checks chain integrity, policy pinning, and the mediation
-invariant. Then break something and watch it fail:
+This runs four separate stages: chain integrity, policy replay (which discards every recorded
+verdict and re-derives it), authorization-execution binding (which re-derives the Cedar request
+from the recorded canonical operation), and effect consistency (which compares the world state
+observed after execution against the authorized operation). Then break something and watch it
+fail:
 
 ```bash
 # flip a recorded decision in the middle of the ledger
@@ -67,22 +69,28 @@ npm run replay
 mv evidence/ledger.jsonl.bak evidence/ledger.jsonl
 ```
 
-One edit, four independent findings:
+The verifier reports four stages and never collapses them, so you can see which property
+broke:
 
 ```
-chain integrity  BROKEN
-findings         4
-  #9  [chain-integrity] hash mismatch: recorded bab897f0483f, recomputed 46547844139c
-  #10 [chain-integrity] prevHash bab897f0483f does not match the previous entry's
-                        recomputed hash 46547844139c
-  #9  [re-decision]     recorded allow, re-decided deny
-  #-1 [mediation]       7 executions against 8 tool-action allow decisions
+chain-integrity      FAIL   checked 26  n/a  0  failures 2
+policy-replay        FAIL   checked 26  n/a  0  failures 1
+auth-exec-binding    PASS   checked 24  n/a  2  failures 0
+effect-consistency   PASS   checked  7  n/a 19  failures 0
 ```
 
-The third of those is the one that matters. The first two say the file was edited. The third
-discards the recorded verdict entirely, re-derives it from the recorded request against the
-pinned policy, and disagrees. That check would still fire if the attacker had recomputed
-every hash in the chain correctly.
+The policy-replay failure is the one that matters. The chain failures say the file was
+edited; policy-replay discards the recorded verdict entirely, re-derives it from the recorded
+request against the pinned policy, and disagrees. It would still fire if the attacker had
+recomputed every hash in the chain correctly.
+
+Two more tampers, each turning a *different* stage red while the others stay green, which is
+how you can tell these are four checks rather than one reported four times:
+
+```bash
+# corrupt an observed effect  -> effect-consistency FAILs, auth-exec-binding PASSes
+# corrupt a recorded operation -> auth-exec-binding FAILs, effect-consistency PASSes
+```
 
 Or change a policy and replay an old ledger against it:
 

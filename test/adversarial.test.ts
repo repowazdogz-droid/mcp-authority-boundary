@@ -7,7 +7,7 @@ import { EnforcementPoint } from '../src/enforce.js';
 import { Ledger } from '../src/ledger.js';
 import { loadEntities, loadPolicy } from '../src/policy.js';
 import { snapshotDocuments } from '../src/tools.js';
-import { mintGrant, consumeGrant } from '../src/mediation.js';
+import { consumeGrant } from '../src/mediation.js';
 
 /**
  * Adversarial audit probes.
@@ -26,34 +26,34 @@ const ENTITIES = new URL('../../entities/entities.json', import.meta.url).pathna
 // A1. Authorization/execution divergence via argument type confusion
 // ---------------------------------------------------------------------------
 
-test('A1 write_document: Cedar is shown byteLen 0 while the tool writes the real payload', () => {
+test('A1 [WAS EXPLOITABLE, NOW BLOCKED] a non-string payload is refused before Cedar', () => {
+  // HISTORICAL WITNESS (docs/AUDIT.md A1): this exact call was authorized as a
+  // zero-byte write and then String()-coerced into a 100,000-byte write, under a
+  // grant capped at 4096. The resolver now rejects non-strings instead of
+  // substituting '' for them, so the operation never comes into existence.
   const { pep, restore } = harness({ session: 'sess-writer-delegated', clock: 2000 });
   try {
     const PAYLOAD = 'x'.repeat(100_000);
-    // `content` is an ARRAY, not a string. resolve.ts measures only strings and
-    // substitutes '' otherwise; tools.ts coerces with String() and writes it.
+    const before = snapshotDocuments().documents.get('corp/public/notes.md');
+
     const { entry } = pep.handle({
       tool: 'write_document',
       args: { path: 'corp/public/notes.md', content: [PAYLOAD] },
     });
 
-    const ctx = entry.cedarRequest.context as { byteLen: number };
-    assert.equal(ctx.byteLen, 0, 'Cedar was asked about a zero-byte write');
-    assert.equal(entry.decision.decision, 'allow');
+    assert.equal(entry.decision.decision, 'deny');
+    assert.equal(entry.decision.denialKind, 'unresolvable-resource');
+    assert.match(entry.decision.explanation, /content must be a string; got array/);
+    assert.equal(entry.operation, null, 'no canonical operation was ever built');
 
-    const written = snapshotDocuments().get('corp/public/notes.md') ?? '';
-    assert.equal(written.length, PAYLOAD.length, 'but 100000 bytes were written');
-
-    // the grant's byte budget is 4096; the write exceeded it by 24x
-    assert.ok(written.length > 4096 * 24);
+    const after = snapshotDocuments().documents.get('corp/public/notes.md');
+    assert.equal(after, before, 'the document is untouched');
   } finally {
     restore();
   }
 });
 
-test('A1b the same session is correctly denied when the payload is a string', () => {
-  // the negative control: the policy DOES work, so A1 is a resolver defect and
-  // not a policy defect
+test('A1b the string case is still correctly denied by policy, not by type rejection', () => {
   const { pep, restore } = harness({ session: 'sess-writer-delegated', clock: 2000 });
   try {
     const { entry } = pep.handle({
@@ -62,25 +62,64 @@ test('A1b the same session is correctly denied when the payload is a string', ()
     });
     assert.equal(entry.decision.decision, 'deny');
     assert.deepEqual(entry.decision.determiningPolicies, ['forbid-oversized-write']);
+    // and the operation DID exist, with an honest byte count
+    assert.equal(entry.operation?.tool, 'write_document');
+    assert.equal((entry.cedarRequest.context as { byteLen: number }).byteLen, 100_000);
   } finally {
     restore();
   }
 });
 
-test('A1c the ledger does not record the resolved arguments, so the divergence is invisible in the record', () => {
+test('A1c the ledger now records the canonical operation and both effect fingerprints', () => {
   const { pep, restore } = harness({ session: 'sess-writer-delegated', clock: 2000 });
   try {
     const { entry } = pep.handle({
       tool: 'write_document',
-      args: { path: 'corp/public/notes.md', content: ['y'.repeat(9000)] },
+      args: { path: 'corp/public/notes.md', content: 'y'.repeat(900) },
     });
-    // the record holds the raw model call and the Cedar context, but nothing
-    // that says what the tool actually received or wrote
-    assert.equal((entry.cedarRequest.context as { byteLen: number }).byteLen, 0);
-    assert.match(entry.toolResult!.summary, /wrote 9000 bytes/);
-    // the ledger has no field for the resolved args, so a replay cannot compare
-    // "what was authorized" against "what ran"
-    assert.equal((entry as unknown as Record<string, unknown>)['resolvedArgs'], undefined);
+    assert.equal(entry.decision.decision, 'allow');
+    assert.ok(entry.operation, 'the operation is in the record');
+    assert.ok(entry.operationSha256, 'and so is its digest');
+    assert.equal((entry.cedarRequest.context as { byteLen: number }).byteLen, 900);
+    assert.deepEqual(entry.observedEffect, entry.authorizedEffect);
+    assert.equal(entry.observedEffect?.byteLen, 900);
+  } finally {
+    restore();
+  }
+});
+
+test('A1d execution consumes the operation, so mutating the raw args after resolution changes nothing', () => {
+  const { pep, restore } = harness({ session: 'sess-writer-delegated', clock: 2000 });
+  try {
+    const args: Record<string, unknown> = { path: 'corp/public/notes.md', content: 'authorized' };
+    const call = { tool: 'write_document', args };
+    // hand the same mutable object to the enforcement point, then mutate it
+    const { entry } = pep.handle(call);
+    args['content'] = 'TAMPERED AFTER RESOLUTION';
+    args['path'] = 'corp/hr/salaries.csv';
+
+    assert.equal(entry.decision.decision, 'allow');
+    const world = snapshotDocuments();
+    assert.equal(world.documents.get('corp/public/notes.md'), 'authorized');
+    assert.match(world.documents.get('corp/hr/salaries.csv') ?? '', /^name,salary/);
+  } finally {
+    restore();
+  }
+});
+
+test('A1e the resolved operation is frozen, so it cannot be edited after authorization', () => {
+  const { pep, restore } = harness({ session: 'sess-writer-delegated', clock: 2000 });
+  try {
+    const { entry } = pep.handle({
+      tool: 'write_document',
+      args: { path: 'corp/public/notes.md', content: 'frozen' },
+    });
+    const op = entry.operation as { content: string };
+    assert.ok(Object.isFrozen(op));
+    // ESM is strict mode, so assignment to a frozen property throws
+    assert.throws(() => {
+      op.content = 'mutated';
+    }, TypeError);
   } finally {
     restore();
   }
@@ -127,7 +166,6 @@ const B_LAUNDERED = session('sess-B-laundered', {
 
 function pepWith(extra: cedar.EntityJson[], sessionId: string, clock: number) {
   const policy = loadPolicy('v1');
-  const entities = loadEntities(extra);
   const path = `/tmp/mab-adv-${sessionId}-${clock}.jsonl`;
   try {
     unlinkSync(path);
@@ -136,10 +174,10 @@ function pepWith(extra: cedar.EntityJson[], sessionId: string, clock: number) {
   }
   return new EnforcementPoint({
     policy,
-    entities,
+    entities: () => loadEntities(extra),
     ledger: new Ledger(path),
     session: { type: 'Mcp::Session', id: sessionId },
-    now: clock,
+    now: () => clock,
     wallClock: '2026-08-07T00:00:00.000Z',
   });
 }
@@ -178,22 +216,36 @@ test('DEFECT A2b: the laundered session outlives the root grant it descends from
 // A3. The clock is captured once per enforcement point, not read per decision
 // ---------------------------------------------------------------------------
 
-test('DEFECT A3: expiry is evaluated against session-start time, so a live session never expires', () => {
-  // The analyst grant expires at 5000. An enforcement point constructed at 2000
-  // keeps answering 2000 forever, because EnforcementConfig.now is a number and
-  // nothing re-reads a clock.
-  const { pep, restore } = harness({ session: 'sess-analyst-delegated', clock: 2000 });
+test('A3 [WAS DEFECTIVE, NOW FIXED] a live enforcement point crosses its own expiry', () => {
+  // HISTORICAL WITNESS (docs/AUDIT.md A3): `now` was a fixed number captured at
+  // construction, so 200 consecutive decisions all saw t=2000 and a grant
+  // expiring at 5000 never expired. The clock is now a function read per decision.
+  let t = 2000;
+  const { pep, restore } = harness({ session: 'sess-analyst-delegated', clock: () => t });
   try {
-    for (let i = 0; i < 200; i++) {
-      const { entry } = pep.handle({
-        tool: 'read_document',
-        args: { path: 'corp/finance/q3-forecast.md' },
-      });
-      assert.equal(entry.decision.decision, 'allow');
-      assert.equal((entry.cedarRequest.context as { now: number }).now, 2000);
-    }
-    // 200 decisions later the clock has not moved. In deployment this is a
-    // session that outlives its own expiry for as long as the process runs.
+    const early = pep.handle({ tool: 'read_document', args: { path: 'corp/finance/q3-forecast.md' } });
+    assert.equal(early.entry.decision.decision, 'allow');
+    assert.equal(early.entry.logicalTime, 2000);
+
+    // same enforcement point, same session, no restart - only time moves
+    t = 6000;
+    const late = pep.handle({ tool: 'read_document', args: { path: 'corp/finance/q3-forecast.md' } });
+    assert.equal(late.entry.decision.decision, 'deny');
+    assert.deepEqual(late.entry.decision.determiningPolicies, ['forbid-outside-validity-window']);
+    assert.equal(late.entry.logicalTime, 6000);
+  } finally {
+    restore();
+  }
+});
+
+test('A3c the clock is read per decision, so each entry records the time it actually saw', () => {
+  let t = 1500;
+  const { pep, restore } = harness({ session: 'sess-alice-root', clock: () => (t += 1000) });
+  try {
+    const times = [0, 1, 2].map(
+      () => pep.handle({ tool: 'read_document', args: { path: 'corp/public/roadmap.md' } }).entry.logicalTime,
+    );
+    assert.deepEqual(times, [2500, 3500, 4500]);
   } finally {
     restore();
   }
@@ -216,15 +268,17 @@ test('A3b expiry does fire when a NEW enforcement point is built past the window
 // A4. The entity store is cached for the life of the enforcement point
 // ---------------------------------------------------------------------------
 
-test('DEFECT A4: flipping `revoked` on disk does not affect a running enforcement point', () => {
+test('A4 [WAS DEFECTIVE, NOW FIXED] revocation on disk reaches a running enforcement point', () => {
+  // HISTORICAL WITNESS (docs/AUDIT.md A4): the entity store was read once at
+  // construction, so flipping `revoked` never reached a running process while
+  // ARCHITECTURE.md claimed revocation was immediate. The store is now read per
+  // decision.
   const backup = readFileSync(ENTITIES, 'utf8');
-  copyFileSync(ENTITIES, '/tmp/mab-entities.bak');
   const { pep, restore } = harness({ session: 'sess-alice-root', clock: 2000 });
   try {
     const before = pep.handle({ tool: 'read_document', args: { path: 'corp/public/roadmap.md' } });
     assert.equal(before.entry.decision.decision, 'allow');
 
-    // revoke the root session at the data plane, on disk
     const revoked = backup.replace(
       /("id": "sess-alice-root" \},\n[\s\S]*?)"revoked": false/,
       '$1"revoked": true',
@@ -232,23 +286,12 @@ test('DEFECT A4: flipping `revoked` on disk does not affect a running enforcemen
     assert.notEqual(revoked, backup, 'the edit must actually change the file');
     writeFileSync(ENTITIES, revoked);
 
-    // the RUNNING enforcement point is unaffected: the store was read once
+    // SAME enforcement point, next decision, no restart
     const after = pep.handle({ tool: 'read_document', args: { path: 'corp/public/roadmap.md' } });
-    assert.equal(
-      after.entry.decision.decision,
-      'allow',
-      'revocation on disk did not reach the running process',
-    );
-
-    // a freshly constructed one does see it
-    const fresh = harness({ session: 'sess-alice-root', clock: 2000 });
-    const freshCall = fresh.pep.handle({
-      tool: 'read_document',
-      args: { path: 'corp/public/roadmap.md' },
-    });
-    fresh.restore();
-    assert.equal(freshCall.entry.decision.decision, 'deny');
-    assert.deepEqual(freshCall.entry.decision.determiningPolicies, ['forbid-revoked-session']);
+    assert.equal(after.entry.decision.decision, 'deny');
+    assert.deepEqual(after.entry.decision.determiningPolicies, ['forbid-revoked-session']);
+    // and the entry records the store it actually read
+    assert.notEqual(after.entry.entitiesSha256, before.entry.entitiesSha256);
   } finally {
     writeFileSync(ENTITIES, backup);
     restore();
@@ -259,20 +302,14 @@ test('DEFECT A4: flipping `revoked` on disk does not affect a running enforcemen
 // A5. The grant is not bound to the resource it was issued for
 // ---------------------------------------------------------------------------
 
-test('DEFECT A5: consumeGrant checks the tool but never the resource or policy version', () => {
-  const g = mintGrant(
-    'audit#1',
-    'read_document',
-    { type: 'Mcp::Document', id: 'corp/public/roadmap.md' },
-    'some-policy-sha',
+test('A5 [CLOSED BY THE NEW BINDING] a grant is bound to the operation digest', () => {
+  // HISTORICAL: consumeGrant checked only the tool name, so the resource the
+  // grant carried was decorative. It now compares the operation digest, which
+  // subsumes the resource and every other security-relevant field.
+  assert.throws(
+    () => consumeGrant({ operationSha256: 'not-a-real-grant' }, { tool: 'read_document', path: 'x' }),
+    /no grant issued by the policy decision point/,
   );
-  // a grant issued for the public roadmap is accepted for any read_document
-  // call; nothing at consumption compares grant.resource to the call's resource
-  const consumed = consumeGrant(g, 'read_document');
-  assert.equal(consumed.resource.id, 'corp/public/roadmap.md');
-  // not reachable from agent input today, because handle() passes the same call
-  // object it authorized - but the capability carries a resource that is never
-  // checked, so the binding is decorative
 });
 
 // ---------------------------------------------------------------------------
@@ -347,7 +384,7 @@ test('A7 legitimate actions are denied because the resource is not pre-registere
 // A8. What the replay verifier cannot see
 // ---------------------------------------------------------------------------
 
-test('A8 a ledger containing the A1 divergence replays as VERIFIED', async () => {
+test('A8 the A1 divergence can no longer be recorded, so there is no such ledger to replay', async () => {
   const path = '/tmp/mab-adv-replay.jsonl';
   try {
     unlinkSync(path);
@@ -355,36 +392,26 @@ test('A8 a ledger containing the A1 divergence replays as VERIFIED', async () =>
     /* fine */
   }
   const policy = loadPolicy('v1');
-  const entities = loadEntities();
   const pep = new EnforcementPoint({
     policy,
-    entities,
+    entities: () => loadEntities(),
     ledger: new Ledger(path),
     session: { type: 'Mcp::Session', id: 'sess-writer-delegated' },
-    now: 2000,
+    now: () => 2000,
     wallClock: '2026-08-07T00:00:00.000Z',
   });
-  pep.handle({
+  const { entry } = pep.handle({
     tool: 'write_document',
     args: { path: 'corp/public/notes.md', content: ['z'.repeat(50_000)] },
   });
 
-  const { readLedger, verifyChain } = await import('../src/ledger.js');
-  const { Pdp } = await import('../src/pdp.js');
-  const entries = readLedger(path);
-  assert.ok(verifyChain(entries).ok, 'chain is intact');
+  // previously this produced an allow with byteLen 0 and a 50KB write
+  assert.equal(entry.decision.decision, 'deny');
+  assert.equal(entry.operation, null);
+  assert.equal(entry.observedEffect, null);
 
-  const pdp = new Pdp(loadPolicy('v1'), loadEntities());
-  const fresh = pdp.decide({
-    requestId: entries[0]!.requestId,
-    principal: entries[0]!.cedarRequest.principal,
-    action: entries[0]!.cedarRequest.action,
-    resource: entries[0]!.cedarRequest.resource,
-    context: entries[0]!.cedarRequest.context as never,
-  });
-  // the verifier re-derives the SAME allow, because it re-decides the recorded
-  // request - and the recorded request is the resolver's output. The resolver
-  // is upstream of everything replay can see.
-  assert.equal(fresh.decision, entries[0]!.decision.decision);
-  assert.equal(fresh.decision, 'allow');
+  const { readLedger, verifyChain } = await import('../src/ledger.js');
+  const entries = readLedger(path);
+  assert.ok(verifyChain(entries).ok);
+  assert.equal(entries.filter((e) => e.toolResult !== null).length, 0);
 });

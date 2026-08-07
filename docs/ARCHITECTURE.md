@@ -21,26 +21,31 @@
 |  MCP SERVER PROCESS                                     |
 |                                                         |
 |   session identity  <---- bound at spawn, out of band   |
-|   logical clock     <---- injected by the host          |
+|   clock             <---- () => number, read PER decision|
+|   entity store      <---- () => store,  read PER decision|
 |   policy set        <---- loaded from disk, hashed      |
 |                                                         |
-|   1. resolve.ts                                         |
-|        strip identity-shaped arguments                  |
-|        canonicalise paths                               |
-|        bind the call to a real resource entity          |
-|        measure the payload the tool would write         |
+|   1. resolve.ts   validate types (reject, never coerce) |
+|        canonicalise paths and addresses                 |
+|        bind to a real resource entity                   |
+|        -> ONE frozen ResolvedOperation                  |
 |                  |                                      |
 |                  v                                      |
-|   2. pdp.ts       Cedar isAuthorized(...)               |
+|   2. pdp.ts       request DERIVED from the operation    |
+|                   Cedar isAuthorized(...)               |
 |                   -> allow | deny + determining ids     |
 |                   -> anything else maps to DENY         |
 |                  |                                      |
-|                  |  on allow: ExecutionGrant (one use)  |
+|                  |  grant bound to sha256(operation)    |
 |                  v                                      |
-|   3. ledger.ts    append, hash-chained. Denials too.    |
+|   3. tools.ts     executes the operation. No raw args.  |
 |                  |                                      |
 |                  v                                      |
-|   4. tools.ts     requires a grant. No grant, no run.   |
+|   4. observe      read the world back; compare to the   |
+|                   authorized effect; throw on mismatch  |
+|                  |                                      |
+|                  v                                      |
+|   5. ledger.ts    append, hash-chained. Denials too.    |
 +=========================================================+
 ```
 
@@ -75,6 +80,27 @@ It does not defend against an agent that has a second, ungoverned MCP server ava
 it does not defend against tampering with the server binary. Both are in
 [THREAT_MODEL.md](THREAT_MODEL.md).
 
+## The binding between authorization and execution
+
+The pipeline produces exactly one canonical object and everything else is derived from it:
+
+```
+raw call
+  -> validate every field to its expected type, REJECTING wrong types (no coercion)
+  -> canonicalise paths and addresses
+  -> freeze a ResolvedOperation carrying every security-relevant execution value
+  -> derive the Cedar request from the operation      (cedarRequestFromOperation)
+  -> decide
+  -> mint a grant bound to sha256(operation)
+  -> executeTool(operation, grant); consumeGrant re-derives the digest and compares
+  -> observe the fixture world and compare to the authorized effect
+```
+
+`executeTool` takes no raw arguments and `src/tools.ts` contains no reference to `call.args`,
+so the two-readers-disagree failure the audit exhibited (A1) has no place to occur. A
+regression test asserts both properties over the source text, because the guarantee is
+structural and a future edit could quietly remove it.
+
 ## Correspondence: the request must describe the effect, not the label
 
 A gate that checks a label passes anything wearing the label. Every input to the decision is
@@ -87,7 +113,7 @@ therefore derived from what the tool would actually do:
 | `resource` | Path canonicalised, then looked up in the entity store | S11: `corp/public/../finance/...` |
 | `context.byteLen` | Measured from the payload to be written | A declared `length` argument is not consulted |
 | `context.recipientDomain` | Parsed from the resolved mailbox | |
-| `context.now` | Host clock, injected at spawn | The model cannot move time |
+| `context.now` | Host clock function, called per decision | The model cannot move time; a live session still expires |
 | `context.sourceTrust` | Whether the turn has read a resource | S07: indirect injection |
 
 Arguments matching an identity-shaped key, or beginning with `_`, are stripped before
@@ -122,8 +148,13 @@ refused as `unresolvable-resource`, rather than being authorised against a guess
 symbol, and which is additionally checked against a `WeakSet` of grants this process
 actually minted. Only `pdp.ts` mints one, and only after Cedar returned `allow`.
 
-Three ways round it are tested and all three fail: constructing a grant directly,
-constructing a look-alike with the right prototype and fields, and reusing a spent grant.
+The grant carries the digest of the authorized operation, and `consumeGrant` recomputes that
+digest from the operation being executed. A grant is therefore spendable on exactly one
+operation, not merely on one tool name.
+
+Four ways round it are tested and all four fail: constructing a grant directly, constructing a
+look-alike with the right prototype and fields, reusing a spent grant, and obtaining a second
+minting capability (`claimMinter` is one-shot and the PDP claims it at module load).
 
 This is a construction argument about this codebase, not a theorem about MCP servers. It is
 backed by a runtime check and by a ledger-level invariant, both described in
@@ -156,8 +187,11 @@ revoking a parent take its children down without enumerating them (S22).
 
 ## Two revocation mechanisms, and why both are here
 
-- **Data plane** (S21): flip `revoked` on the session entity. Immediate on the next
-  decision, no deployment.
+- **Data plane** (S21): flip `revoked` on the session entity. The entity store is read on
+  every decision, so this takes effect on the next decision in an already-running process,
+  with no deployment and no restart. That sentence was false until the adversarial audit
+  (finding A4) caught the store being cached for the life of the process; test `A4` now holds
+  it true by flipping the file under a running enforcement point.
 - **Control plane** (S13b): deploy a forbid policy. This changes the policy-set hash, so the
   ledger records it as a distinct version, and both the before and after entries replay
   correctly against the version each was decided under.

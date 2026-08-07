@@ -26,14 +26,21 @@ import type { EntityUid } from './types.js';
  */
 const sessionId = process.env['MCP_SESSION_ID'] ?? 'sess-alice-root';
 const session: EntityUid = { type: 'Mcp::Session', id: sessionId };
-const now = Number(process.env['MCP_CLOCK'] ?? '2000');
+const clockBase = Number(process.env['MCP_CLOCK'] ?? '2000');
+// Advance the logical clock by this much per decision. 0 keeps the demo
+// byte-reproducible; a non-zero step lets a single running server cross an
+// expiry boundary, which is what audit finding A3 showed was impossible before.
+const clockStep = Number(process.env['MCP_CLOCK_STEP'] ?? '0');
+let tick = 0;
+const now = () => clockBase + clockStep * tick++;
 const ledgerPath = process.env['MCP_LEDGER'] ?? 'evidence/ledger.jsonl';
 const overlays = (process.env['MCP_POLICY_OVERLAYS'] ?? '').split(',').filter(Boolean);
 const versionId = process.env['MCP_POLICY_VERSION'] ?? (overlays.length ? 'v2' : 'v1');
 const wallClock = process.env['MCP_WALLCLOCK'] ?? '2026-08-07T00:00:00.000Z';
 
 const policy = loadPolicy(versionId, overlays);
-const entities = loadEntities();
+// Re-read per decision so revocation on disk reaches a running process (A4).
+const entities = () => loadEntities();
 const ledger = new Ledger(ledgerPath);
 const pep = new EnforcementPoint({ policy, entities, ledger, session, now, wallClock });
 

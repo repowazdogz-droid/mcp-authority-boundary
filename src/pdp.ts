@@ -1,7 +1,10 @@
 import * as cedar from '@cedar-policy/cedar-wasm/nodejs';
 import type { LoadedPolicy, EntityStore } from './policy.js';
-import { mintGrant, type ExecutionGrant } from './mediation.js';
-import type { CedarContext, Decision, EntityUid, ToolName } from './types.js';
+import { claimMinter, type ExecutionGrant } from './mediation.js';
+
+/** The PDP claims the sole minting capability at module load. See mediation.ts. */
+const mintGrant = claimMinter();
+import type { CedarContext, Decision, EntityUid, ResolvedOperation } from './types.js';
 
 export interface DecideInput {
   requestId: string;
@@ -10,6 +13,8 @@ export interface DecideInput {
   resource: EntityUid;
   /** Tool actions carry the full ToolContext; `delegate` carries only `now`. */
   context: CedarContext | { now: number };
+  /** The entity store as read for THIS decision. Never cached by the PDP. */
+  entities: EntityStore;
   /**
    * Entities that exist only for this decision - specifically, the child
    * session proposed by a `delegate` request, which must be evaluated before
@@ -20,7 +25,9 @@ export interface DecideInput {
 
 export interface AuthorizeInput extends DecideInput {
   context: CedarContext;
-  tool: ToolName;
+  /** The frozen operation the grant will be bound to. */
+  operation: ResolvedOperation;
+  operationSha256: string;
 }
 
 export type AuthorizeResult =
@@ -47,10 +54,7 @@ export type AuthorizeResult =
  * subject of test/failclosed.test.ts.
  */
 export class Pdp {
-  constructor(
-    private readonly policy: LoadedPolicy,
-    private readonly entities: EntityStore,
-  ) {}
+  constructor(private readonly policy: LoadedPolicy) {}
 
   /**
    * Evaluate a request and classify the answer. Used directly for decisions
@@ -64,8 +68,8 @@ export class Pdp {
       resource: input.resource,
       context: input.context as unknown as cedar.Context,
       entities: input.extraEntities
-        ? [...this.entities.entities, ...input.extraEntities]
-        : this.entities.entities,
+        ? [...input.entities.entities, ...input.extraEntities]
+        : input.entities.entities,
       policies: { staticPolicies: this.policy.staticPolicies },
       schema: this.policy.schema,
       // Ask Cedar to check the request itself against the schema. Without this a
@@ -112,7 +116,12 @@ export class Pdp {
     }
     return {
       decision: decision as Decision & { decision: 'allow' },
-      grant: mintGrant(input.requestId, input.tool, input.resource, this.policy.version.sha256),
+      grant: mintGrant(
+        input.requestId,
+        input.operationSha256,
+        input.resource,
+        this.policy.version.sha256,
+      ),
     };
   }
 
