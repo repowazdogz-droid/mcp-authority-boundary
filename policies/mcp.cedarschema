@@ -1,0 +1,136 @@
+// Cedar schema for the MCP authority boundary.
+//
+// Read this first. Everything the policy engine is allowed to reason about is
+// declared here, and Cedar's strict validator rejects any policy that steps
+// outside it. A request whose action, entity types, or context shape do not
+// match this schema is a *validation failure*, which the PDP maps to DENY
+// (fail-closed). See src/pdp.ts.
+
+namespace Mcp {
+
+  // ---------------------------------------------------------------------
+  // Context supplied by the Policy Enforcement Point. NEVER by the model.
+  //
+  //   now              logical clock, injected by the host at session setup
+  //   sourceTrust      "user"        - no untrusted content has entered this turn
+  //                    "tool_output" - the agent has read content from a resource,
+  //                                    so its subsequent arguments may be attacker-
+  //                                    influenced. Turn-level and coarse; this is
+  //                                    NOT information-flow tracking (see docs/LIMITATIONS.md).
+  //   byteLen          size of the payload the tool would actually write
+  //   recipientDomain  resolved destination domain for egress actions
+  //   requestId        ledger correlation id
+  // ---------------------------------------------------------------------
+  type ToolContext = {
+    "now": Long,
+    "sourceTrust": String,
+    "byteLen": Long,
+    "recipientDomain": String,
+    "requestId": String,
+  };
+
+  // ---------------------------------------------------------------------
+  // Principals
+  // ---------------------------------------------------------------------
+
+  // A person. Delegates authority; never itself a request principal here.
+  entity Human;
+
+  // An LLM agent identity. Belongs to the human it acts for.
+  entity Agent in [Human];
+
+  // Capability tiers, ordered by the entity hierarchy:
+  //   read in write in admin
+  // A policy asks `Permission::"write" in principal.permission`, which is true
+  // exactly when the session was granted write or anything above it. Attenuation
+  // is therefore structural and transitive, not a set-comparison in application code.
+  entity Permission in [Permission];
+
+  // Resource scopes, also a hierarchy. Every resource is a member of one scope,
+  // so `resource in principal.scope` is a transitive containment test.
+  entity Scope in [Scope];
+
+  // THE REQUEST PRINCIPAL. A session is a delegated capability handle, bound to
+  // the transport out of band at connection setup. The model cannot mint one,
+  // name one, or alter one: see docs/THREAT_MODEL.md, assumption A2.
+  entity Session in [Agent] {
+    agent: Agent,
+    delegator: Human,
+    permission: Permission,     // capability tier granted to this session
+    scope: Scope,               // resource subtree this session may touch
+    notBefore: Long,            // temporary capability: valid-from
+    expiresAt: Long,            // temporary capability: valid-until (exclusive)
+    revoked: Bool,              // data-plane revocation
+    maxWriteBytes: Long,        // quantitative attenuation
+    depth: Long,                // 0 for a root grant, +1 per delegation hop
+    delegatedFrom?: Session,    // the grant this one was attenuated from
+  };
+
+  // ---------------------------------------------------------------------
+  // Resources
+  // ---------------------------------------------------------------------
+  entity Document in [Scope] {
+    owner: Human,
+    path: String,
+    classification: String,     // "public" | "internal" | "restricted"
+  };
+
+  entity Mailbox in [Scope] {
+    address: String,
+    external: Bool,             // true when the domain is outside the organisation
+  };
+
+  entity Table in [Scope] {
+    database: String,
+    containsPii: Bool,
+  };
+
+  entity Host in [Scope] {
+    hostname: String,
+    production: Bool,
+  };
+
+  // ---------------------------------------------------------------------
+  // Actions
+  //
+  // The action groups carry the tool -> capability-tier mapping. Putting it here
+  // rather than in TypeScript keeps it inside the machine-checked artifact: a tool
+  // cannot be silently reclassified without editing this schema, and the validator
+  // will reject any policy that references a tier that does not exist.
+  // ---------------------------------------------------------------------
+  // These three groups PARTITION the tool actions - they deliberately do not
+  // nest. An earlier draft had `dangerousGroup in [mutatingGroup]`, on the
+  // reasoning that deleting a file is a kind of mutation. That was a privilege
+  // escalation: `permit-write-tier` matches `action in mutatingGroup`, so every
+  // write-tier session silently acquired delete and shell. Tier inheritance
+  // belongs in the Permission hierarchy (read in write in admin), where it is
+  // stated once; duplicating it in the action hierarchy multiplies the two
+  // together. test/regression.test.ts pins this.
+  action readOnlyGroup;
+  action mutatingGroup;
+  action dangerousGroup;
+
+  action "readDocument"  in [readOnlyGroup]
+    appliesTo { principal: [Session], resource: [Document], context: ToolContext };
+
+  action "queryDatabase" in [readOnlyGroup]
+    appliesTo { principal: [Session], resource: [Table], context: ToolContext };
+
+  action "writeDocument" in [mutatingGroup]
+    appliesTo { principal: [Session], resource: [Document], context: ToolContext };
+
+  action "sendEmail"     in [mutatingGroup]
+    appliesTo { principal: [Session], resource: [Mailbox], context: ToolContext };
+
+  action "executeShell"  in [dangerousGroup]
+    appliesTo { principal: [Session], resource: [Host], context: ToolContext };
+
+  action "deleteFile"    in [dangerousGroup]
+    appliesTo { principal: [Session], resource: [Document], context: ToolContext };
+
+  // Minting a delegated session is itself an authorization decision, evaluated by
+  // the same engine against the same policy set. This is what makes the
+  // attenuation argument inductive rather than a convention: see docs/ARCHITECTURE.md.
+  action "delegate"
+    appliesTo { principal: [Session], resource: [Session], context: { "now": Long } };
+}

@@ -1,0 +1,153 @@
+[
+  { "uid": { "type": "Mcp::Human", "id": "alice" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Mcp::Human", "id": "bob" }, "attrs": {}, "parents": [] },
+
+  { "uid": { "type": "Mcp::Agent", "id": "assistant" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Human", "id": "alice" }] },
+
+  { "uid": { "type": "Mcp::Permission", "id": "admin" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Mcp::Permission", "id": "write" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Permission", "id": "admin" }] },
+  { "uid": { "type": "Mcp::Permission", "id": "read" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Permission", "id": "write" }] },
+
+  { "uid": { "type": "Mcp::Scope", "id": "org" }, "attrs": {}, "parents": [] },
+  { "uid": { "type": "Mcp::Scope", "id": "corp" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Scope", "id": "org" }] },
+  { "uid": { "type": "Mcp::Scope", "id": "corp/public" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Scope", "id": "corp" }] },
+  { "uid": { "type": "Mcp::Scope", "id": "corp/finance" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Scope", "id": "corp" }] },
+  { "uid": { "type": "Mcp::Scope", "id": "corp/hr" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Scope", "id": "corp" }] },
+  { "uid": { "type": "Mcp::Scope", "id": "external" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Scope", "id": "org" }] },
+  { "uid": { "type": "Mcp::Scope", "id": "infra" }, "attrs": {},
+    "parents": [{ "type": "Mcp::Scope", "id": "org" }] },
+
+  { "uid": { "type": "Mcp::Session", "id": "sess-alice-root" },
+    "attrs": {
+      "agent": { "__entity": { "type": "Mcp::Agent", "id": "assistant" } },
+      "delegator": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+      "permission": { "__entity": { "type": "Mcp::Permission", "id": "admin" } },
+      "scope": { "__entity": { "type": "Mcp::Scope", "id": "org" } },
+      "notBefore": 1000, "expiresAt": 9000, "revoked": false,
+      "maxWriteBytes": 1048576, "depth": 0
+    },
+    "parents": [{ "type": "Mcp::Agent", "id": "assistant" }] },
+
+  { "uid": { "type": "Mcp::Session", "id": "sess-analyst-delegated" },
+    "attrs": {
+      "agent": { "__entity": { "type": "Mcp::Agent", "id": "assistant" } },
+      "delegator": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+      "permission": { "__entity": { "type": "Mcp::Permission", "id": "read" } },
+      "scope": { "__entity": { "type": "Mcp::Scope", "id": "corp/finance" } },
+      "notBefore": 1000, "expiresAt": 5000, "revoked": false,
+      "maxWriteBytes": 4096, "depth": 1,
+      "delegatedFrom": { "__entity": { "type": "Mcp::Session", "id": "sess-alice-root" } }
+    },
+    "parents": [{ "type": "Mcp::Agent", "id": "assistant" }] },
+
+  { "uid": { "type": "Mcp::Session", "id": "sess-writer-delegated" },
+    "attrs": {
+      "agent": { "__entity": { "type": "Mcp::Agent", "id": "assistant" } },
+      "delegator": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+      "permission": { "__entity": { "type": "Mcp::Permission", "id": "write" } },
+      "scope": { "__entity": { "type": "Mcp::Scope", "id": "corp/public" } },
+      "notBefore": 1000, "expiresAt": 9000, "revoked": false,
+      "maxWriteBytes": 4096, "depth": 1,
+      "delegatedFrom": { "__entity": { "type": "Mcp::Session", "id": "sess-alice-root" } }
+    },
+    "parents": [{ "type": "Mcp::Agent", "id": "assistant" }] },
+
+  { "uid": { "type": "Mcp::Session", "id": "sess-rogue-widened" },
+    "attrs": {
+      "agent": { "__entity": { "type": "Mcp::Agent", "id": "assistant" } },
+      "delegator": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+      "permission": { "__entity": { "type": "Mcp::Permission", "id": "admin" } },
+      "scope": { "__entity": { "type": "Mcp::Scope", "id": "org" } },
+      "notBefore": 1000, "expiresAt": 9000, "revoked": false,
+      "maxWriteBytes": 1048576, "depth": 2,
+      "delegatedFrom": { "__entity": { "type": "Mcp::Session", "id": "sess-analyst-delegated" } }
+    },
+    "parents": [{ "type": "Mcp::Agent", "id": "assistant" }] },
+
+  { "uid": { "type": "Mcp::Session", "id": "sess-revoked" },
+    "attrs": {
+      "agent": { "__entity": { "type": "Mcp::Agent", "id": "assistant" } },
+      "delegator": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+      "permission": { "__entity": { "type": "Mcp::Permission", "id": "admin" } },
+      "scope": { "__entity": { "type": "Mcp::Scope", "id": "org" } },
+      "notBefore": 1000, "expiresAt": 9000, "revoked": true,
+      "maxWriteBytes": 1048576, "depth": 0
+    },
+    "parents": [{ "type": "Mcp::Agent", "id": "assistant" }] },
+
+  { "uid": { "type": "Mcp::Session", "id": "sess-child-of-revoked" },
+    "attrs": {
+      "agent": { "__entity": { "type": "Mcp::Agent", "id": "assistant" } },
+      "delegator": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+      "permission": { "__entity": { "type": "Mcp::Permission", "id": "read" } },
+      "scope": { "__entity": { "type": "Mcp::Scope", "id": "corp/public" } },
+      "notBefore": 1000, "expiresAt": 9000, "revoked": false,
+      "maxWriteBytes": 0, "depth": 1,
+      "delegatedFrom": { "__entity": { "type": "Mcp::Session", "id": "sess-revoked" } }
+    },
+    "parents": [{ "type": "Mcp::Agent", "id": "assistant" }] },
+
+  { "uid": { "type": "Mcp::Session", "id": "sess-too-deep" },
+    "attrs": {
+      "agent": { "__entity": { "type": "Mcp::Agent", "id": "assistant" } },
+      "delegator": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+      "permission": { "__entity": { "type": "Mcp::Permission", "id": "read" } },
+      "scope": { "__entity": { "type": "Mcp::Scope", "id": "corp/public" } },
+      "notBefore": 1000, "expiresAt": 9000, "revoked": false,
+      "maxWriteBytes": 0, "depth": 3,
+      "delegatedFrom": { "__entity": { "type": "Mcp::Session", "id": "sess-writer-delegated" } }
+    },
+    "parents": [{ "type": "Mcp::Agent", "id": "assistant" }] },
+
+  { "uid": { "type": "Mcp::Document", "id": "corp/public/roadmap.md" },
+    "attrs": { "owner": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+               "path": "corp/public/roadmap.md", "classification": "public" },
+    "parents": [{ "type": "Mcp::Scope", "id": "corp/public" }] },
+
+  { "uid": { "type": "Mcp::Document", "id": "corp/public/notes.md" },
+    "attrs": { "owner": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+               "path": "corp/public/notes.md", "classification": "internal" },
+    "parents": [{ "type": "Mcp::Scope", "id": "corp/public" }] },
+
+  { "uid": { "type": "Mcp::Document", "id": "corp/finance/q3-forecast.md" },
+    "attrs": { "owner": { "__entity": { "type": "Mcp::Human", "id": "alice" } },
+               "path": "corp/finance/q3-forecast.md", "classification": "internal" },
+    "parents": [{ "type": "Mcp::Scope", "id": "corp/finance" }] },
+
+  { "uid": { "type": "Mcp::Document", "id": "corp/hr/salaries.csv" },
+    "attrs": { "owner": { "__entity": { "type": "Mcp::Human", "id": "bob" } },
+               "path": "corp/hr/salaries.csv", "classification": "restricted" },
+    "parents": [{ "type": "Mcp::Scope", "id": "corp/hr" }] },
+
+  { "uid": { "type": "Mcp::Mailbox", "id": "alice@example.com" },
+    "attrs": { "address": "alice@example.com", "external": false },
+    "parents": [{ "type": "Mcp::Scope", "id": "corp" }] },
+
+  { "uid": { "type": "Mcp::Mailbox", "id": "exfil@evil.example" },
+    "attrs": { "address": "exfil@evil.example", "external": true },
+    "parents": [{ "type": "Mcp::Scope", "id": "external" }] },
+
+  { "uid": { "type": "Mcp::Table", "id": "crm.customers" },
+    "attrs": { "database": "crm", "containsPii": true },
+    "parents": [{ "type": "Mcp::Scope", "id": "infra" }] },
+
+  { "uid": { "type": "Mcp::Table", "id": "analytics.metrics" },
+    "attrs": { "database": "analytics", "containsPii": false },
+    "parents": [{ "type": "Mcp::Scope", "id": "infra" }] },
+
+  { "uid": { "type": "Mcp::Host", "id": "build-01" },
+    "attrs": { "hostname": "build-01", "production": false },
+    "parents": [{ "type": "Mcp::Scope", "id": "infra" }] },
+
+  { "uid": { "type": "Mcp::Host", "id": "prod-db-01" },
+    "attrs": { "hostname": "prod-db-01", "production": true },
+    "parents": [{ "type": "Mcp::Scope", "id": "infra" }] }
+]

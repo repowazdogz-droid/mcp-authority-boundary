@@ -1,0 +1,11 @@
+{
+  "ledger": "evidence/ledger.jsonl",
+  "entries": 26,
+  "chainIntact": true,
+  "reDecided": 26,
+  "executions": 7,
+  "allowDecisions": 7,
+  "findings": [],
+  "verdict": "VERIFIED",
+  "scope": "Re-derivation uses the same Cedar engine that produced the original decisions. A match establishes that the ledger is a faithful, reproducible record of what the engine decided - not that the engine is correct, and not that the recorded events occurred."
+}

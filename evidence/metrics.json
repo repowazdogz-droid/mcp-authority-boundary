@@ -1,0 +1,42 @@
+{
+  "scenarios": 24,
+  "ledgerEntries": 26,
+  "decisions": {
+    "allow": 8,
+    "deny": 18
+  },
+  "denialsByKind": {
+    "explicit-forbid": 12,
+    "no-matching-permit": 6
+  },
+  "determiningPolicyFrequency": {
+    "permit-read-tier": 5,
+    "forbid-outside-validity-window": 1,
+    "forbid-oversized-write": 1,
+    "forbid-external-egress-after-untrusted-read": 1,
+    "forbid-restricted-document-below-admin": 2,
+    "forbid-pii-table-below-admin": 1,
+    "revoke-session-analyst-delegated": 1,
+    "permit-delegate-attenuated": 1,
+    "forbid-widening-delegation": 1,
+    "forbid-shell-on-production-host": 1,
+    "permit-admin-tier": 1,
+    "forbid-revoked-session": 1,
+    "forbid-revoked-ancestor": 1,
+    "forbid-excessive-delegation-depth": 1,
+    "permit-write-tier": 1
+  },
+  "policyVersionsExercised": [
+    "v1",
+    "v2"
+  ],
+  "policiesInSet": 15,
+  "policiesExercisedAsDetermining": 15,
+  "policyCoverage": "15/15",
+  "policiesNeverDetermining": [],
+  "executions": 7,
+  "toolAllows": 7,
+  "mediationInvariantHolds": true,
+  "forgedIdentityFieldsIgnored": 4,
+  "unmediatedBaselineExecutions": 18
+}

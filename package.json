@@ -1,0 +1,29 @@
+{
+  "name": "mcp-authority-boundary",
+  "version": "1.0.0",
+  "description": "A reproducible research artifact: machine-checked Cedar authorization at the MCP boundary holds even when the LLM is adversarial.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "tsc",
+    "demo": "npm run build && node dist/src/demo.js",
+    "demo:live": "npm run build && MCP_LIVE_MODEL=1 node dist/src/demo.js",
+    "replay": "node dist/src/replay.js",
+    "verify": "npm run build && node dist/src/demo.js && node dist/src/replay.js && node --test 'dist/test/*.test.js' && node scripts/screenshot.mjs",
+    "test": "npm run build && node --test 'dist/test/*.test.js'",
+    "clean": "rm -rf dist evidence",
+    "screenshot": "node scripts/screenshot.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "@cedar-policy/cedar-wasm": "4.12.0",
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
