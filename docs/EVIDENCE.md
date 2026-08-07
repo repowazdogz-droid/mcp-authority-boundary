@@ -105,9 +105,30 @@ different standing:
   are trusted base. The MCPSecBench mapping in particular is an interpretation of that
   benchmark's classes, not something the benchmark asserts.
 
-**Missing data.** None. Every declared step produced a ledger entry, and a request the host
-could not resolve still produces an entry, classified `unresolvable-resource`, rather than
-being dropped.
+**Missing data.** Every step declared in `src/scenarios.ts` produced a ledger entry. A request
+whose arguments the host cannot bind to a known resource also produces an entry, classified
+`unresolvable-resource`, rather than being dropped.
+
+One class of request produces no entry at all. It is recorded here rather than left for a
+reader to discover, because a measurement section that claimed complete coverage of attempts
+would be the exact failure this artifact is about. `isToolName` tests `name in TOOL_ACTION`,
+and JavaScript's `in` operator walks the prototype chain, so a tool name that is an inherited
+`Object.prototype` key (`constructor`, `toString`, `valueOf`, `hasOwnProperty`,
+`isPrototypeOf`, `__proto__`) passes that guard. No `switch` branch then matches, the canonical
+operation is never built, and the resolver throws.
+
+Observed behaviour on the current build, over the MCP transport: the caller receives JSON-RPC
+error `-32603`, no grant is minted, no tool runs, the fixture world is unchanged, the server
+continues serving subsequent calls, and no ledger entry is written for the attempt. A sequence
+of four calls in which one used such a name produced three entries. A genuinely unknown tool
+name, by contrast, is denied and logged normally as `unresolvable-resource`.
+
+This is fail-closed with respect to execution and it is not an authorization bypass: claims A,
+B and D in the README are unaffected. What it does mean is narrower and worth stating plainly.
+The ledger is a complete record of *decisions*, not of *attempts*, and the five denial kinds in
+`src/types.ts` do not cover this outcome. Anyone treating the ledger as an exhaustive audit
+trail of everything an agent tried should know that a request rejected by an exception upstream
+of the decision point leaves no trace in it.
 
 **Sensitivity.** The counts were re-derived under one alternative: running every scenario
 through the in-process enforcement point (the test suite) instead of over the MCP
