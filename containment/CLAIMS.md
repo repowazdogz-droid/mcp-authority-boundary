@@ -155,18 +155,25 @@ across several. L11 also repeats this layer's three load-bearing limitations, so
 that reading `docs/LIMITATIONS.md` alone cannot leave a stronger impression than
 the artifact supports.
 
-### Next step, not done
+### Structural mediation - DONE
 
-Making the mediator structurally unbypassable rather than in-series by
-convention (`HONESTY.md` H1) is **not done and is recorded as the next step, not
-as a residual risk anyone has accepted.** It requires changes to
-`ExecutionGrant`, `consumeGrant`, `Pdp.authorize` and `EnforcementPoint.handle` -
-the trusted core whose behaviour claims A and B rest on, pinned by
-`test/adversarial.test.ts`, `test/mediation.test.ts` and
-`test/regression.test.ts`. That is a separately reviewable change to a released
-artifact's most load-bearing machinery, and bundling it into the same commit as
-the merge would combine two changes with very different risk profiles and make
-a regression in either hard to attribute. Until it is done, the honest statement
-of the property is the one in H1 and in L11: in series for callers who go
-through it, which is a fact about how the system is assembled and not a property
-of the system.
+The weakness recorded here as "not done" has since been closed. Effect mediation
+is mandatory: `EnforcementConfig.mediator` is required, `EnforcementPoint.handle`
+mediates every operation before authorization, and `consumeGrant` refuses to
+execute without a mediation record bound to the grant, naming the operation, and
+carrying an `allow` verdict. `MediatedSession` - the wrapper callers could
+decline to use - is deleted.
+
+Three honest qualifications, all detailed in `HONESTY.md` H1 and H3:
+
+- **Unbypassable is not contained.** `permitAllMediator()` satisfies the
+  mechanism and permits everything, saying so in every ledger record. What sits
+  behind mediation is a deployment choice.
+- **Delegation is not covered.** It mints no grant and runs no tool, so
+  capability creation remains Cedar-gated only. A real remaining gap.
+- **Two things were lost.** The cross-layer digest re-check is gone (one
+  resolution now, nothing to compare), and T1 asserts that the real PDP allows
+  the four attack operations rather than that the enforcement point executes
+  them. The execution half moved to T1b, against a deployment configured to
+  permit every effect.
+

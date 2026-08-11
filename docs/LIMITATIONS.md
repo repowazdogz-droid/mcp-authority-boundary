@@ -200,15 +200,20 @@ this one, and vice versa. Do not cite either as covering the other.
 **Three limitations of that layer are load-bearing and are repeated here** so that reading
 this file alone cannot leave a reader with a stronger impression than the artifact supports:
 
-- **It is not structurally unbypassable.** The mediator is in series by construction of the
-  call path, not by construction of the system. Anyone holding the underlying
-  `EnforcementPoint` can call it directly and skip the mediator entirely - the test harness
-  does exactly that, deliberately, via `harness({mediated: false})`, which is how T1 and T5
-  obtain unmediated Cedar verdicts. Making it structurally unbypassable requires the same
-  one-shot capability trick `src/mediation.ts` uses for `ExecutionGrant`, applied to
-  mediation, and that means changes to `ExecutionGrant`, `consumeGrant`, `Pdp.authorize` and
-  `EnforcementPoint.handle`. **Not done. Logged as the next step, not as a residual risk
-  someone has accepted.**
+- **Effect mediation is mandatory, and that part IS structural now.** This entry
+  originally said the opposite, and the change is recorded rather than silently
+  corrected. `EnforcementConfig.mediator` is required with no default;
+  `EnforcementPoint.handle` mediates every operation before authorization, so a
+  refusal means no grant is minted; and `consumeGrant` refuses to execute
+  without a mediation record bound to the grant, naming the operation being
+  executed, and carrying an `allow` verdict. Holding an `EnforcementPoint` no
+  longer buys an unmediated execution. **But do not read "unbypassable" as
+  "contained":** `permitAllMediator()` permits every effect and stamps that fact
+  into every ledger entry, and a deployment using it has mediation in the
+  mechanical sense and no containment in the useful sense - the same relationship
+  L2 describes between a permissive policy and faithful enforcement. Delegation
+  is NOT covered: it mints no grant and runs no tool, so capability creation
+  remains Cedar-gated only, which is a real remaining gap.
 - **Every guarantee is conditional on the declaration being truthful, and nothing verifies
   it.** The static checker reads a DECLARED graph, and the `egress` flag on a resource is a
   human-supplied claim that no mechanism in this repository checks - Cedar has no vocabulary
@@ -218,11 +223,18 @@ this file alone cannot leave a reader with a stronger impression than the artifa
   both confident and both wrong. This is L2 ("nothing checks that the policy means what its
   author intended") reappearing one level up, and the containment layer inherits it rather
   than fixing it.
-- **`RepresentationDriftError` is untested and must not be cited as a demonstrated catch.**
-  The digest re-check after execution is a live assertion for which no input producing a
-  divergence has been found. It has caught nothing. It also compares two uses of one shared
-  function (`resolveCall`), so it is a consistency check and not an independent oracle: if
-  that function mis-parses, both layers agree on the wrong answer and the check passes.
+- **The cross-layer digest re-check has been REMOVED, and T1 claims less than it
+  did.** `RepresentationDriftError` compared two independent resolutions of the
+  same call; with mediation inside `handle` there is only one resolution, so the
+  check is gone. It never caught anything and was never an independent oracle -
+  it compared two uses of one shared function - so it must not be cited as a
+  demonstrated catch in either its old form or its absence. Relatedly, T1 now
+  asserts that the real PDP **allows** all four attack operations, not that the
+  enforcement point **executes** them; the enforcement point does not, because
+  mediation refuses step 2. The execution half is shown separately in T1b,
+  against a deployment configured to permit every effect. Preserving the older,
+  stronger-sounding T1 would have required a test-only bypass, which is the flag
+  audit finding A9 removed.
 
 The containment layer accepts the same two bounds this artifact does and adds no exception
 to either: the general safety question for access-control systems is undecidable (Harrison,

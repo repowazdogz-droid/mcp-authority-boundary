@@ -6,51 +6,69 @@ weaknesses found while building it, including the ones no test can fail on.
 
 ---
 
-## H1. The mediator is in series by construction of the call path, not structurally
+## H1. The mediator is structurally unbypassable (as of the H1 change)
 
-`MediatedSession.handle` runs the mediator before the host enforcement point, so
-a denial there means Cedar is never consulted and the effect never occurs. T3
-asserts exactly this: the blocked step has `cedar === null`.
+**This entry previously said the opposite, and the old text is kept below because
+the history matters more than a tidy document.**
 
-That is real, and it is weaker than it sounds. **Anyone holding the underlying
-`EnforcementPoint` can call it directly and skip this object entirely.** The
-fixture does precisely that on purpose - `harness({mediated: false})` hands out
-raw drivers, which is how T1 and T5 obtain unmediated Cedar verdicts. The same
-door is open to any other caller.
+### What holds now
 
-So the containment layer is in series for callers who go through it, which is a
-statement about how the system is assembled, not a property of the system.
+Effect mediation is mandatory and enforced at the point of execution:
 
-The host solved the equivalent problem for itself and the fix is instructive.
-`src/mediation.ts` makes tool execution require an `ExecutionGrant`, and the
-capability to mint one is claimed exactly once, at module load, by the PDP:
+- `EnforcementConfig.mediator` is required, with no default and no optional
+  marker. A deployment must choose what sits behind mediation.
+- `EnforcementPoint.handle` mediates every operation between resolution and
+  authorization. A denial means no grant is minted at all.
+- `consumeGrant` refuses to execute without a mediation record whose digest is
+  the one the grant is bound to, whose `operationSha256` is the operation being
+  executed, and whose verdict is `allow`.
 
-```ts
-export function claimMinter(): Minter {
-  if (minterClaimed) throw new Error('...already been claimed by the PDP');
-  ...
-}
-```
+Holding an `EnforcementPoint` therefore no longer buys an unmediated execution,
+which is exactly what it used to buy.
 
-A second minting path cannot be added by importing the module - it has to be
-added by editing that file, which is a reviewable act. Applying the same shape
-here would mean the tool layer requiring evidence of mediation in addition to
-its grant, which means changing `consumeGrant`, `ExecutionGrant`, and the PDP
-that mints it.
+### What this does NOT mean
 
-**Coupling points that a structural fix would have to touch** (found by building
-against them, listed for whoever does the work):
+**It does not mean every deployment contains effects.** `permitAllMediator()`
+permits everything and stamps `NO_MEDIATION_CONFIGURED` into every record it
+issues. A deployment using it has effect mediation in the mechanical sense and
+no effect containment in the useful sense. That is a deployment choice, visible
+in the config and in every ledger entry, and it is the exact analogue of L2: a
+permissive policy is enforced faithfully. Do not read "structurally
+unbypassable" as "contained".
 
-| Host location | What would change |
-|---|---|
-| `src/mediation.ts` - `ExecutionGrant` | Carry a mediation attestation alongside `operationSha256`. |
-| `src/mediation.ts` - `consumeGrant` | Verify that attestation, and refuse without it, the way it already refuses on a digest mismatch. |
-| `src/pdp.ts` - `authorize` | Accept the mediation record as an input to minting, so an unmediated allow cannot produce a spendable grant. |
-| `src/enforce.ts` - `EnforcementPoint.handle` | Either call the mediator itself, or stop being publicly constructible. |
+**It does not cover delegation.** `handleDelegation` mints no grant and runs no
+tool, so it is outside the mechanism entirely. Capability creation is one of the
+effect sinks this layer classifies, and at the enforcement point it is still
+Cedar-gated only. That is a real remaining gap, not an oversight.
 
-None of that is possible from outside the host repo. This is the single
-strongest argument in the repo-placement question, and it is an argument for
-merging.
+**The negative controls are what make this believable, and they were not free.**
+When the refusals were first switched on, the entire suite stayed green - not
+one existing test reached them, because the existing `consumeGrant` tests pass
+non-grant objects that throw at the first check. A guarantee whose failure path
+is never taken is not demonstrated. Each of the four refusals is now made to
+fire, with a positive control proving they do not simply block everything, and
+the whole set was verified by mutation: with the checks disabled, exactly the
+four negative controls fail.
+
+### What it said before, and why
+
+> The mediator is in series by construction of the call path, not structurally.
+> `MediatedSession.handle` runs the mediator before the host enforcement point,
+> so a denial there means Cedar is never consulted and the effect never occurs.
+> That is real, and it is weaker than it sounds. Anyone holding the underlying
+> `EnforcementPoint` can call it directly and skip this object entirely. The
+> fixture does precisely that on purpose - `harness({mediated: false})` hands
+> out raw drivers, which is how T1 and T5 obtain unmediated Cedar verdicts. The
+> same door is open to any other caller. So the containment layer is in series
+> for callers who go through it, which is a statement about how the system is
+> assembled, not a property of the system.
+
+`MediatedSession` no longer exists. Its deletion is the change, not a side
+effect of it: a wrapper that callers may decline to use cannot carry a security
+property, and the fix was to move the obligation to the point where execution
+actually happens.
+
+The cost was paid by T1, which had been using that same bypass. See H3.
 
 ## H2. Every guarantee is conditional on the declaration being truthful
 
@@ -74,23 +92,48 @@ absent from the declared graph is classified `namespace-creation` and denied
 *undeclared* resource is caught. A resource that is declared but declared
 *wrongly* is not.
 
-## H3. The digest re-check catches representation drift, not semantic drift
+## H3. The digest re-check is GONE, and T1 now claims less
 
-After execution, `MediatedSession.handle` compares the digest it mediated
-against `entry.operationSha256` from the host ledger and throws
-`RepresentationDriftError` on a mismatch. That catches the case where the object
-this layer reasoned about is not the object the host authorized.
+Two things changed here and both are losses worth stating plainly.
 
-What it does not catch: both layers agreeing on an operation that means
-something other than what either believes. The two resolutions share
-`resolveCall`, so they share its bugs - if the SQL table regex mis-parses a
-query into a plausible wrong table (the host's L3), both layers agree on the
-wrong answer and the check passes. It is a consistency check between two uses of
-one function, not an independent oracle.
+### The differential check was removed
 
-`RepresentationDriftError` is also **not exercised by any test**, because no
-input has been found that produces a divergence. It is a live assertion, not a
-demonstrated catch, and it should not be cited as one.
+Previously `MediatedSession.handle` resolved the call independently, mediated on
+that result, then compared its digest against the host's ledger entry and threw
+`RepresentationDriftError` on a mismatch. With mediation inside
+`EnforcementPoint.handle` there is exactly one resolution, so there is nothing
+left to compare and the check is deleted.
+
+It was never worth much - it compared two uses of one shared function
+(`resolveCall`), so if that function mis-parsed, both layers agreed on the wrong
+answer and the check passed - and it never caught anything: no input producing a
+divergence was ever found. **It must not be cited, in its old form or its
+absence, as a demonstrated catch.** But removing an unexercised check is still
+removing a check, and it is recorded here rather than quietly dropped.
+
+### T1 asserts something narrower than it used to
+
+T1 used to assert that the per-call layer both AUTHORIZED and EXECUTED all four
+steps of the attack, and it obtained that by routing through
+`harness({mediated: false})` - the bypass.
+
+It now asserts only that **the real PDP allows all four operations**, obtained
+from `Pdp.decide`: the same engine, the same unmodified policy set, the same
+request derivation, and no grant minted, so it neither needs mediation nor
+circumvents it. The enforcement point no longer executes step 2, because the
+mediator refuses it.
+
+The fairness assertion survives in substance - the gap is real, every individual
+call is authorized, no `forbid` fires, nothing is a strawman. But "authorized"
+and "executed" are different claims and only the first is now made. Keeping a
+test-only bypass to preserve the stronger-sounding one would have resurrected
+precisely the flag audit finding A9 removed, which is not a trade worth making
+for a test.
+
+The execution half is demonstrated separately, in **T1b**, against a deployment
+configured with `permitAllMediator()`. That is not a bypass: the mechanism runs
+in full and the deployment has chosen to permit every effect, which is what any
+deployment that has not adopted effect containment looks like.
 
 ## H4. What the fixture does and does not establish
 

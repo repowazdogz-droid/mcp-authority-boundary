@@ -22,8 +22,9 @@ From the repository root:
 npm test
 ```
 
-Expect 133 tests, 0 failures - 100 for the per-call boundary and 33 for this
-layer (12 pure checker, 15 mediator, 6 acceptance tests T1-T5). This layer has
+Expect 139 tests, 0 failures - 105 for the per-call boundary (including five
+negative controls on mandatory effect mediation) and 34 for this layer (12 pure
+checker, 15 mediator, 7 acceptance tests T1-T5). This layer has
 no build or test scaffolding of its own; it compiles with the repository's
 `tsconfig.json` and runs in the repository's single test command.
 
@@ -37,7 +38,8 @@ npm run build && node --test dist/containment/test/*.test.js
 
 | | |
 |---|---|
-| **T1** | The per-call layer authorizes **every** call in the attack trace. Four steps, four Cedar `allow` verdicts, no `forbid` policy fired. The gap is real, not a strawman. |
+| **T1** | The real Cedar PDP **allows** every one of the four attack operations - four `allow` verdicts, no `forbid` fired. The gap is real, not a strawman. It asserts authorization, not execution: mediation is mandatory and refuses step 2. See `HONESTY.md` H3. |
+| **T1b** | The amplification is real - agent B ends up holding finance content it has no authority to read - shown against a deployment configured to permit every effect, which is what no effect containment looks like. |
 | **T2** | The static checker flags `CRIT` on the shared resource, naming both agents as the witness. |
 | **T3** | The runtime mediator blocks the external effect before Cedar is consulted, attributes it to the originating agent, and records why. |
 | **T4** | The repaired deployment passes the checker with nothing outstanding - and T4b shows the repair re-routes the function through the mediator rather than deleting it. |

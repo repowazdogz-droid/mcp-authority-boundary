@@ -27,12 +27,9 @@
  * between what this layer mediated and what the host authorized is caught rather
  * than assumed absent.
  */
-import { resolveCall } from '../../src/resolve.js';
 import { sha256, canonicalJson } from '../../src/canonical.js';
-import type { EnforcementPoint } from '../../src/enforce.js';
-import type { ToolResult } from '../../src/tools.js';
-import type { EntityStore } from '../../src/policy.js';
-import type { LedgerEntry, ModelToolCall, ResolvedOperation } from '../../src/types.js';
+import type { EffectMediation, EffectMediator } from '../../src/mediation.js';
+import type { EntityUid, ResolvedOperation } from '../../src/types.js';
 import { findResource, type Graph, type Principal } from './graph.js';
 
 /**
@@ -175,7 +172,7 @@ function sinkIsMediated(sink: Sink, graph: Graph, actor: string): boolean {
 
 const GENESIS = '0'.repeat(64);
 
-export class Mediator {
+export class Mediator implements EffectMediator {
   private readonly state = new Map<string, PrincipalState>();
   private readonly records: MediationRecord[] = [];
   private prevHash = GENESIS;
@@ -314,76 +311,29 @@ export class Mediator {
     if (s.denials >= this.budgets.breakerTrip) s.breakerOpen = true;
     return this.record(principal, operationSha256, sinks, 'deny', reason);
   }
-}
 
-/** Raised when the operation the host authorized is not the one we mediated. */
-export class RepresentationDriftError extends Error {}
-
-export interface MediatedOutcome {
-  readonly mediation: MediationRecord;
-  /** Null when the mediator denied, because the host layer was never reached. */
-  readonly hostEntry: LedgerEntry | null;
-  /** Null when nothing executed - mediator denial or host denial alike. */
-  readonly result: ToolResult | null;
-}
-
-/**
- * The in-series composition.
- *
- * `handle` is the only path to the tool layer that this object offers, and the
- * mediator runs before the host enforcement point, so a denial here means the
- * host never decides and the effect never occurs.
- *
- * The honest limit, stated here because it belongs next to the code that has it:
- * this is in series by CONSTRUCTION OF THE CALL PATH, not structurally. Anyone
- * holding the underlying EnforcementPoint can call it directly and skip this
- * object entirely. Closing that would need the host's one-shot capability trick
- * from src/mediation.ts applied to `handle` itself, which means editing the
- * host. See HONESTY.md.
- */
-export class MediatedSession {
-  constructor(
-    private readonly principal: string,
-    private readonly ep: EnforcementPoint,
-    private readonly mediator: Mediator,
-    private readonly entities: () => EntityStore,
-    private readonly now: () => number,
-  ) {}
-
-  handle(raw: ModelToolCall): MediatedOutcome {
-    const now = this.now();
-
-    // Resolve through the HOST's resolver. Not a second parser: the same
-    // function the enforcement point will use, so the operation this layer
-    // mediates is the operation that object is about.
-    const pre = resolveCall(raw, {
-      requestId: `mediator:${this.principal}`,
-      now,
-      sourceTrust: 'user',
-      entities: this.entities(),
-    });
-
-    const operation = pre.ok ? pre.call.operation : null;
-    const digest = pre.ok ? pre.call.operationSha256 : null;
-
-    const mediation = this.mediator.mediate(this.principal, operation, digest, now);
-    if (mediation.verdict === 'deny') {
-      return { mediation, hostEntry: null, result: null };
-    }
-
-    const { entry, result } = this.ep.handle(raw);
-
-    // The differential check. Two resolutions of the same raw call, run
-    // independently, must agree on the operation's identity. They share a
-    // function, so this catches state-dependent drift rather than a shared bug -
-    // it is a consistency check, not an independent oracle.
-    if (entry.operationSha256 !== null && entry.operationSha256 !== digest) {
-      throw new RepresentationDriftError(
-        `mediated operation ${String(digest).slice(0, 12)} but host authorized ` +
-          `${String(entry.operationSha256).slice(0, 12)}`,
-      );
-    }
-
-    return { mediation, hostEntry: entry, result };
+  /**
+   * The EffectMediator interface the enforcement point requires.
+   *
+   * This is what makes the layer structural rather than conventional. There is
+   * no wrapper object a caller can decline to use: `EnforcementPoint.handle`
+   * calls this on every operation, and `consumeGrant` refuses to execute
+   * without the record it returns. The old `MediatedSession` wrapper - which
+   * was in series only for callers who chose to route through it - is gone,
+   * and its deletion is the point of the change rather than a side effect.
+   */
+  mediateOperation(
+    principal: EntityUid,
+    operation: ResolvedOperation,
+    operationSha256: string,
+    now: number,
+  ): EffectMediation {
+    const record = this.mediate(principal.id, operation, operationSha256, now);
+    return {
+      operationSha256,
+      verdict: record.verdict,
+      reason: record.reason,
+      hash: record.hash,
+    };
   }
 }
