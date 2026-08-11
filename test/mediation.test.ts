@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ExecutionGrant, claimMinter, consumeGrant } from '../src/mediation.js';
+import {
+  ExecutionGrant,
+  claimMinter,
+  consumeGrant,
+  type EffectMediation,
+} from '../src/mediation.js';
+import { Pdp } from '../src/pdp.js';
+import { loadEntities, loadPolicy } from '../src/policy.js';
+import { cedarRequestFromOperation } from '../src/resolve.js';
 import { executeTool } from '../src/tools.js';
 import { readLedger } from '../src/ledger.js';
 import { sha256Canonical } from '../src/canonical.js';
@@ -112,4 +120,91 @@ test('every executed entry carries matching authorized and observed effects', ()
   } finally {
     restore();
   }
+});
+
+// ---------------------------------------------------------------------------
+// Mandatory effect mediation: NEGATIVE CONTROLS.
+//
+// These exist because the mediation refusals in consumeGrant were, when first
+// switched on, not exercised by a single existing test - the suite stayed green
+// and would have stayed green if the checks did nothing at all. A guarantee
+// whose failure path is never taken is not demonstrated, so each refusal below
+// is made to fire, and the last test proves the checks are not simply blocking
+// everything.
+// ---------------------------------------------------------------------------
+
+/** Mint a real grant through the real PDP for an operation Cedar allows. */
+function realGrant(op: ResolvedOperation, mediation: EffectMediation) {
+  const policy = loadPolicy('mediation-negative-controls');
+  const pdp = new Pdp(policy);
+  const { action, resource, byteLen, recipientDomain } = cedarRequestFromOperation(op);
+  const outcome = pdp.authorize({
+    requestId: 'neg-control',
+    principal: { type: 'Mcp::Session', id: 'sess-alice-root' },
+    action,
+    resource,
+    context: {
+      now: 2000,
+      sourceTrust: 'user',
+      byteLen,
+      recipientDomain,
+      requestId: 'neg-control',
+    },
+    entities: loadEntities(),
+    operation: op,
+    operationSha256: sha256Canonical(op),
+    mediation,
+  });
+  assert.equal(outcome.decision.decision, 'allow', 'fixture requires a Cedar allow');
+  return outcome.grant!;
+}
+
+function mediationFor(op: ResolvedOperation, verdict: 'allow' | 'deny' = 'allow'): EffectMediation {
+  const body = { operationSha256: sha256Canonical(op), verdict, reason: 'negative-control' };
+  return { ...body, hash: sha256Canonical(body) };
+}
+
+const OTHER_OP: ResolvedOperation = Object.freeze({
+  tool: 'read_document',
+  path: 'corp/public/notes.md',
+});
+
+test('NEGATIVE CONTROL: a grant cannot be spent with no mediation record', () => {
+  const med = mediationFor(OP);
+  const grant = realGrant(OP, med);
+  assert.throws(() => executeTool(OP, grant), /no effect mediation presented/);
+});
+
+test('NEGATIVE CONTROL: a grant cannot be spent with a different mediation record', () => {
+  const med = mediationFor(OP);
+  const grant = realGrant(OP, med);
+  const substituted: EffectMediation = { ...med, reason: 'tampered', hash: 'f'.repeat(64) };
+  assert.throws(() => executeTool(OP, grant, substituted), /grant is bound to mediation/);
+});
+
+test('NEGATIVE CONTROL: mediation cleared for one operation cannot clear another', () => {
+  // The linkage check. Both digests match their own bindings; only the
+  // operation the mediation NAMES catches the substitution.
+  const medForOther = mediationFor(OTHER_OP);
+  const grant = realGrant(OTHER_OP, medForOther);
+  assert.throws(
+    () => executeTool(OP, grant, medForOther),
+    /mediation clears operation .* but the operation presented/,
+  );
+});
+
+test('NEGATIVE CONTROL: a deny verdict refuses execution even with a matching grant', () => {
+  const denied = mediationFor(OP, 'deny');
+  const grant = realGrant(OP, denied);
+  assert.throws(() => executeTool(OP, grant, denied), /the effect mediator returned deny/);
+});
+
+test('POSITIVE CONTROL: the correct grant, operation and mediation together execute', () => {
+  // Without this the four refusals above would also pass if consumeGrant simply
+  // threw on everything.
+  const med = mediationFor(OP);
+  const grant = realGrant(OP, med);
+  const result = executeTool(OP, grant, med);
+  assert.equal(result.ok, true);
+  assert.match(result.summary, /^read corp\/public\/roadmap\.md/);
 });

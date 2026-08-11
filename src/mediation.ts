@@ -176,8 +176,42 @@ export function consumeGrant(
   if (!(grant instanceof ExecutionGrant) || !issued.has(grant)) {
     throw new Error('refusing to execute: no grant issued by the policy decision point');
   }
-  void mediation; // enforced in the next commit; threaded here so the shape is in place
+
+  // MEDIATION IS MANDATORY. Three separate refusals, because there are three
+  // separate ways to be handed something that looks like clearance and is not.
+  if (mediation === undefined) {
+    throw new Error(
+      'refusing to execute: no effect mediation presented. Every operation must be ' +
+        'mediated; a deployment that does not want effect containment configures ' +
+        'permitAllMediator(), it does not omit the record',
+    );
+  }
+  if (grant.mediationSha256 !== mediation.hash) {
+    throw new Error(
+      `refusing to execute: grant is bound to mediation ${grant.mediationSha256.slice(0, 12)}, ` +
+        `but the record presented digests to ${mediation.hash.slice(0, 12)}`,
+    );
+  }
+
   const digest = sha256Canonical(operation);
+
+  // The linkage check. Without it, a mediation record cleared for one operation
+  // could be presented alongside a grant for another: both digests would match
+  // their own bindings and neither would notice they were about different
+  // things. The record names the operation it judged, and this is where that
+  // name is made to matter.
+  if (mediation.operationSha256 !== digest) {
+    throw new Error(
+      `refusing to execute: mediation clears operation ${mediation.operationSha256.slice(0, 12)}, ` +
+        `but the operation presented digests to ${digest.slice(0, 12)}`,
+    );
+  }
+  if (mediation.verdict !== 'allow') {
+    throw new Error(
+      `refusing to execute: the effect mediator returned ${mediation.verdict} (${mediation.reason})`,
+    );
+  }
+
   if (grant.operationSha256 !== digest) {
     throw new Error(
       `refusing to execute: grant authorises operation ${grant.operationSha256.slice(0, 12)}, ` +
