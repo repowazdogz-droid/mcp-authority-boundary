@@ -16,7 +16,7 @@
     "test": "npm run build && npm run test:only",
     "clean": "rm -rf dist evidence",
     "screenshot": "node scripts/screenshot.mjs",
-    "test:only": "node --test --test-concurrency=1 dist/test/*.test.js"
+    "test:only": "node --test --test-concurrency=1 dist/test/*.test.js dist/containment/test/*.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

@@ -165,3 +165,66 @@ Where a scenario cites a structural class from MCPSecBench (arXiv:2508.13220), t
 was made by this artifact's author by reading the benchmark's taxonomy. It is an
 interpretation. The benchmark does not assert these correspondences, this artifact does not
 run the benchmark, and no score against it is claimed.
+
+## L11. The containment layer's claims are ADDITIONAL and SEPARATELY SCOPED
+
+`containment/` holds a second layer, added after this artifact's v1.0.0 release. Read this
+entry before reading anything across the two as one set of claims, because they are not one
+set of claims.
+
+**Nothing in `containment/` strengthens, weakens, or restates claims A, B, C or D.** Those
+four are about the per-call boundary: complete mediation, authorization-execution binding,
+policy adequacy, effect verification. They stand exactly as they did at v1.0.0, established
+by exactly the evidence they were established by, and the containment layer neither adds to
+that evidence nor depends on being believed for any of it. Its own claims live in
+`containment/CLAIMS.md` and are scoped there; its own weaknesses live in
+`containment/HONESTY.md`. Neither file amends this one.
+
+**It is a different gap from L1, and the resemblance is the trap.** L1 says authorization
+bounds authority but not intent: a compromised agent can still do harm with authority it
+legitimately holds, and no policy engine answers "should this action be taken now, given why
+the agent came to want it". That is a claim about ONE principal and its intent.
+
+The containment layer addresses something else: authority that exists in the deployment but
+belongs to NO principal individually. Two agents, each correctly constrained, each acting
+entirely within its own scope and with no compromised intent anywhere, compose through one
+shared resource into effective authority neither was granted. `containment/` T1 exhibits
+this against the unmodified policy set in this repository - four calls, four Cedar `allow`
+verdicts from `permit-read-tier` and `permit-write-tier`, no `forbid` policy fired - after
+which an agent holding no authority over `corp/finance` is holding finance content.
+
+L1 is about the gap between authority and intent. L11 is about the gap between per-call
+authority and composed authority. An artifact that closed L1 completely would still have
+this one, and vice versa. Do not cite either as covering the other.
+
+**Three limitations of that layer are load-bearing and are repeated here** so that reading
+this file alone cannot leave a reader with a stronger impression than the artifact supports:
+
+- **It is not structurally unbypassable.** The mediator is in series by construction of the
+  call path, not by construction of the system. Anyone holding the underlying
+  `EnforcementPoint` can call it directly and skip the mediator entirely - the test harness
+  does exactly that, deliberately, via `harness({mediated: false})`, which is how T1 and T5
+  obtain unmediated Cedar verdicts. Making it structurally unbypassable requires the same
+  one-shot capability trick `src/mediation.ts` uses for `ExecutionGrant`, applied to
+  mediation, and that means changes to `ExecutionGrant`, `consumeGrant`, `Pdp.authorize` and
+  `EnforcementPoint.handle`. **Not done. Logged as the next step, not as a residual risk
+  someone has accepted.**
+- **Every guarantee is conditional on the declaration being truthful, and nothing verifies
+  it.** The static checker reads a DECLARED graph, and the `egress` flag on a resource is a
+  human-supplied claim that no mechanism in this repository checks - Cedar has no vocabulary
+  for "this document is mirrored to a partner portal", which is precisely why the per-call
+  layer cannot weigh it and precisely why nothing validates it either. An operator who omits
+  that flag from a resource that has it gets a clean `check()` and a permissive mediator,
+  both confident and both wrong. This is L2 ("nothing checks that the policy means what its
+  author intended") reappearing one level up, and the containment layer inherits it rather
+  than fixing it.
+- **`RepresentationDriftError` is untested and must not be cited as a demonstrated catch.**
+  The digest re-check after execution is a live assertion for which no input producing a
+  divergence has been found. It has caught nothing. It also compares two uses of one shared
+  function (`resolveCall`), so it is a consistency check and not an independent oracle: if
+  that function mis-parses, both layers agree on the wrong answer and the check passes.
+
+The containment layer accepts the same two bounds this artifact does and adds no exception
+to either: the general safety question for access-control systems is undecidable (Harrison,
+Ruzzo and Ullman 1976), and channels below a model's resource granularity are not addressed
+by anything operating at that granularity (Lampson 1973).
