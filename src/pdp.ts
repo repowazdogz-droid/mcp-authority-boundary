@@ -1,6 +1,6 @@
 import * as cedar from '@cedar-policy/cedar-wasm/nodejs';
 import type { LoadedPolicy, EntityStore } from './policy.js';
-import { claimMinter, type ExecutionGrant } from './mediation.js';
+import { claimMinter, type EffectMediation, type ExecutionGrant } from './mediation.js';
 
 /** The PDP claims the sole minting capability at module load. See mediation.ts. */
 const mintGrant = claimMinter();
@@ -28,6 +28,8 @@ export interface AuthorizeInput extends DecideInput {
   /** The frozen operation the grant will be bound to. */
   operation: ResolvedOperation;
   operationSha256: string;
+  /** The mediator's verdict on this operation's effect. Bound into the grant. */
+  mediation: EffectMediation;
 }
 
 export type AuthorizeResult =
@@ -119,6 +121,7 @@ export class Pdp {
       grant: mintGrant(
         input.requestId,
         input.operationSha256,
+        input.mediation.hash,
         input.resource,
         this.policy.version.sha256,
       ),
@@ -165,6 +168,29 @@ function explain(
     default:
       return `deny: ${target}`;
   }
+}
+
+/**
+ * Used when the effect mediator refuses an operation.
+ *
+ * Recorded as its own denial kind rather than folded into a Cedar denial,
+ * because Cedar was never consulted: reporting this as a policy decision would
+ * be a false explanation in exactly the way `DenialKind` exists to prevent.
+ */
+export function denyMediated(
+  requestId: string,
+  reason: string,
+): Decision & { decision: 'deny' } {
+  return {
+    requestId,
+    decision: 'deny',
+    determiningPolicies: [],
+    denialKind: 'mediation-denied',
+    errors: [reason],
+    explanation:
+      `deny (effect mediation): ${reason}. The effect was refused before the request ` +
+      `reached Cedar, so no policy decision was made and no grant exists`,
+  };
 }
 
 /** Used by the resolver when a tool call names something that does not exist. */

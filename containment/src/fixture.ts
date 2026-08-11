@@ -13,6 +13,7 @@
  * such a flag in its audit finding A9, and adding one back here to make testing
  * convenient would make "in series" a property of who is calling.
  */
+import { permitAllMediator } from '../../src/mediation.js';
 import { EnforcementPoint } from '../../src/enforce.js';
 import { Ledger } from '../../src/ledger.js';
 import { loadEntities, loadPolicy, type EntityStore } from '../../src/policy.js';
@@ -93,6 +94,7 @@ export function harness(
         session: session(principal),
         now: () => NOW,
         wallClock: '2026-08-09T00:00:00.000Z',
+        mediator: permitAllMediator(),
       });
       points.set(principal, p);
     }

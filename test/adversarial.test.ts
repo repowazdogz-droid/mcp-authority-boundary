@@ -1,3 +1,4 @@
+import { permitAllMediator } from '../src/mediation.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
@@ -181,6 +182,7 @@ function pepWith(extra: cedar.EntityJson[], sessionId: string, clock: number) {
     session: { type: 'Mcp::Session', id: sessionId },
     now: () => clock,
     wallClock: '2026-08-07T00:00:00.000Z',
+    mediator: permitAllMediator(),
   });
 }
 
@@ -401,6 +403,7 @@ test('A8 the A1 divergence can no longer be recorded, so there is no such ledger
     session: { type: 'Mcp::Session', id: 'sess-writer-delegated' },
     now: () => 2000,
     wallClock: '2026-08-07T00:00:00.000Z',
+    mediator: permitAllMediator(),
   });
   const { entry } = pep.handle({
     tool: 'write_document',

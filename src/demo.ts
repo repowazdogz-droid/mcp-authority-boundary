@@ -1,3 +1,4 @@
+import { permitAllMediator } from './mediation.js';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { BoundaryClient, type CallEnvelope } from './client.js';
 import { HostileRawClient } from './rawclient.js';
@@ -51,6 +52,7 @@ async function runOverMcp(s: Scenario): Promise<StepOutcome[]> {
     overlays: s.overlays,
     policyVersion: s.policyVersion,
     wallClock: WALLCLOCK,
+    mediator: permitAllMediator(),
   };
   const client = s.useRawClient ? new HostileRawClient(env) : new BoundaryClient(env);
   await client.connect();
@@ -89,6 +91,7 @@ function runDelegations(s: Scenario): StepOutcome[] {
     session: { type: 'Mcp::Session', id: s.session },
     now: () => s.clock,
     wallClock: WALLCLOCK,
+    mediator: permitAllMediator(),
   });
 
   return s.steps.flatMap((st) => {

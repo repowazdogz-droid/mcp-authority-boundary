@@ -20,7 +20,7 @@ test('a tool cannot run without a grant', () => {
 
 test('a forged grant object is rejected', () => {
   assert.throws(
-    () => new ExecutionGrant(Symbol('not-the-guard'), 'x', sha256Canonical(OP), OP as never, 'x'),
+    () => new ExecutionGrant(Symbol('not-the-guard'), 'x', sha256Canonical(OP), 'med', OP as never, 'x'),
     /may only be minted by the policy decision point/,
   );
 

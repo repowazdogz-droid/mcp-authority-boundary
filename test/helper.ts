@@ -1,3 +1,4 @@
+import { permitAllMediator } from '../src/mediation.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,6 +38,7 @@ export function harness(opts: {
       session,
       now: typeof opts.clock === 'function' ? opts.clock : () => opts.clock as number,
       wallClock: '2026-08-07T00:00:00.000Z',
+      mediator: permitAllMediator(),
     }),
     ledgerPath,
     restore: () => restoreDocuments(snapshot),

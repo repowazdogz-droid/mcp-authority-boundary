@@ -115,7 +115,8 @@ export type DenialKind =
   | 'no-matching-permit' // Cedar's default deny; no policy matched at all
   | 'evaluation-error' // policies errored; treated as deny, fail-closed
   | 'request-validation-failure' // request did not typecheck against the schema
-  | 'unresolvable-resource'; // the host could not build a canonical operation
+  | 'unresolvable-resource' // the host could not build a canonical operation
+  | 'mediation-denied'; // the effect mediator refused before Cedar was consulted
 
 export interface Decision {
   requestId: string;
@@ -166,6 +167,8 @@ export interface LedgerEntry {
   extraEntities?: unknown[];
   ignoredModelFields: string[];
   decision: Decision;
+  /** The mediator's verdict on the effect, or null where no operation existed. */
+  mediation: { verdict: 'allow' | 'deny'; reason: string; hash: string } | null;
   /** Present only when the decision was allow and the tool then ran. */
   toolResult: { ok: boolean; summary: string } | null;
   /** Derived from the authorized operation before execution. */

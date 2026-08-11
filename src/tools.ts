@@ -1,4 +1,4 @@
-import { consumeGrant } from './mediation.js';
+import { consumeGrant, type EffectMediation } from './mediation.js';
 import { sha256 } from './canonical.js';
 import type { EffectFingerprint, ResolvedOperation } from './types.js';
 
@@ -112,8 +112,12 @@ export interface ToolResult {
  * carries the operation's digest and `consumeGrant` compares it, so a grant
  * issued for one operation cannot be spent on another.
  */
-export function executeTool(op: ResolvedOperation, grant: unknown): ToolResult {
-  consumeGrant(grant, op);
+export function executeTool(
+  op: ResolvedOperation,
+  grant: unknown,
+  mediation?: EffectMediation,
+): ToolResult {
+  consumeGrant(grant, op, mediation);
 
   switch (op.tool) {
     case 'read_document': {

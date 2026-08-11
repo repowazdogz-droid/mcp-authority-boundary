@@ -358,8 +358,15 @@ test('F8 the tool layer contains no coercion of operation fields and no access t
   assert.ok(!/\bNumber\(/.test(exec), 'executeTool must not coerce with Number()');
   assert.ok(!/\bcall\.args\b/.test(src), 'the tool layer must not reference raw args');
   assert.ok(!/unsafe_bypass/.test(src), 'the bypass flag must not come back');
-  // and the signature takes an operation, not a call
-  assert.match(src, /export function executeTool\(\s*op: ResolvedOperation,\s*grant: unknown,?\s*\)/);
+  // and the signature takes an operation, not a call. The third parameter is
+  // the mediation record the grant is bound to; it is a verdict about the
+  // operation, never a source of execution values, which is why the raw-args
+  // and coercion assertions above are the ones that carry the weight.
+  assert.match(
+    src,
+    /export function executeTool\(\s*op: ResolvedOperation,\s*grant: unknown,\s*mediation\??: EffectMediation,?\s*\)/,
+  );
+  assert.ok(!/\bargs\b/.test(exec), 'executeTool must not reference args at all');
 });
 
 // ---------------------------------------------------------------------------

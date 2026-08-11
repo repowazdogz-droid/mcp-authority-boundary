@@ -26,9 +26,66 @@ import type { EntityUid, ResolvedOperation } from './types.js';
  */
 const PDP_ONLY = Symbol('minted-by-pdp');
 
+/**
+ * A mediator's verdict on the EFFECT of one operation.
+ *
+ * Declared here rather than where mediators are implemented, so that the
+ * enforcement path can require one without knowing anything about how effects
+ * are classified. `operationSha256` is part of the record on purpose: a verdict
+ * that did not name the operation it was about could be replayed against a
+ * different one, and `consumeGrant` would have no way to notice.
+ */
+export interface EffectMediation {
+  readonly operationSha256: string;
+  readonly verdict: 'allow' | 'deny';
+  readonly reason: string;
+  /** Digest over the record, bound into the grant. */
+  readonly hash: string;
+}
+
+export interface EffectMediator {
+  mediateOperation(
+    principal: EntityUid,
+    operation: ResolvedOperation,
+    operationSha256: string,
+    now: number,
+  ): EffectMediation;
+}
+
+export const NO_MEDIATION_CONFIGURED =
+  'permit-all: this deployment configured no effect mediation';
+
+/**
+ * A mediator that permits every effect, and says so in every record it issues.
+ *
+ * This is the analogue of a permissive policy set, not a hole. The MECHANISM is
+ * unbypassable either way - `consumeGrant` refuses to execute without a
+ * mediation record bound to the operation - and what a deployment chooses to put
+ * behind that mechanism is a deployment decision, visible in the config and in
+ * every ledger entry it produces. Compare docs/LIMITATIONS.md L2: a policy that
+ * is wrong is enforced faithfully.
+ *
+ * It exists because mediation is mandatory, so every deployment must supply
+ * something, including the ones whose subject is not effect containment at all.
+ */
+export function permitAllMediator(): EffectMediator {
+  return {
+    mediateOperation(_principal, _operation, operationSha256) {
+      const body = {
+        operationSha256,
+        verdict: 'allow' as const,
+        reason: NO_MEDIATION_CONFIGURED,
+      };
+      return { ...body, hash: sha256Canonical(body) };
+    },
+  };
+}
+
 export class ExecutionGrant {
   readonly requestId: string;
   readonly operationSha256: string;
+  /** Digest of the mediation record that cleared this operation's effect. */
+  readonly mediationSha256: string;
   readonly resource: EntityUid;
   readonly policyVersionSha: string;
 
@@ -36,6 +93,7 @@ export class ExecutionGrant {
     guard: symbol,
     requestId: string,
     operationSha256: string,
+    mediationSha256: string,
     resource: EntityUid,
     policyVersionSha: string,
   ) {
@@ -46,6 +104,7 @@ export class ExecutionGrant {
     }
     this.requestId = requestId;
     this.operationSha256 = operationSha256;
+    this.mediationSha256 = mediationSha256;
     this.resource = resource;
     this.policyVersionSha = policyVersionSha;
   }
@@ -60,6 +119,7 @@ let spentTotal = 0;
 export type Minter = (
   requestId: string,
   operationSha256: string,
+  mediationSha256: string,
   resource: EntityUid,
   policyVersionSha: string,
 ) => ExecutionGrant;
@@ -67,10 +127,18 @@ export type Minter = (
 function mint(
   requestId: string,
   operationSha256: string,
+  mediationSha256: string,
   resource: EntityUid,
   policyVersionSha: string,
 ): ExecutionGrant {
-  const g = new ExecutionGrant(PDP_ONLY, requestId, operationSha256, resource, policyVersionSha);
+  const g = new ExecutionGrant(
+    PDP_ONLY,
+    requestId,
+    operationSha256,
+    mediationSha256,
+    resource,
+    policyVersionSha,
+  );
   issued.add(g);
   return g;
 }
@@ -100,10 +168,15 @@ export function claimMinter(): Minter {
  * content, a character of path, a recipient - produces a different digest and
  * is refused.
  */
-export function consumeGrant(grant: unknown, operation: ResolvedOperation): ExecutionGrant {
+export function consumeGrant(
+  grant: unknown,
+  operation: ResolvedOperation,
+  mediation?: EffectMediation,
+): ExecutionGrant {
   if (!(grant instanceof ExecutionGrant) || !issued.has(grant)) {
     throw new Error('refusing to execute: no grant issued by the policy decision point');
   }
+  void mediation; // enforced in the next commit; threaded here so the shape is in place
   const digest = sha256Canonical(operation);
   if (grant.operationSha256 !== digest) {
     throw new Error(

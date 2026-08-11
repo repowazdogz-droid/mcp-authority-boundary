@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { permitAllMediator } from './mediation.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -42,7 +43,15 @@ const policy = loadPolicy(versionId, overlays);
 // Re-read per decision so revocation on disk reaches a running process (A4).
 const entities = () => loadEntities();
 const ledger = new Ledger(ledgerPath);
-const pep = new EnforcementPoint({ policy, entities, ledger, session, now, wallClock });
+const pep = new EnforcementPoint({
+  policy,
+  entities,
+  ledger,
+  session,
+  now,
+  wallClock,
+  mediator: permitAllMediator(),
+});
 
 const server = new Server(
   { name: 'mcp-authority-boundary', version: '1.0.0' },

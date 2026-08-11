@@ -1,7 +1,8 @@
 import type * as cedar from '@cedar-policy/cedar-wasm/nodejs';
-import { Pdp, denyUnresolvable } from './pdp.js';
+import { Pdp, denyMediated, denyUnresolvable } from './pdp.js';
 import { resolveCall } from './resolve.js';
 import { executeTool, expectedEffectOf, observeEffect, effectsMatch, type ToolResult } from './tools.js';
+import type { EffectMediation, EffectMediator } from './mediation.js';
 import type { EntityStore, LoadedPolicy } from './policy.js';
 import { engineVersions } from './policy.js';
 import type { Ledger } from './ledger.js';
@@ -54,6 +55,17 @@ export interface EnforcementConfig {
    */
   now: () => number;
   wallClock: string;
+  /**
+   * Effect mediation, REQUIRED.
+   *
+   * Deliberately not optional and with no default. Mediation is mandatory for
+   * every operation, so a deployment has to choose what sits behind it; a
+   * deployment that does not want effect containment passes
+   * `permitAllMediator()` and every ledger entry it writes says so. An optional
+   * field would have made the guarantee depend on remembering to set it, which
+   * is the class of weakness this change exists to remove.
+   */
+  mediator: EffectMediator;
 }
 
 interface RecordInput {
@@ -68,6 +80,7 @@ interface RecordInput {
   context: CedarContext | { now: number };
   ignoredModelFields: string[];
   decision: Decision;
+  mediation: EffectMediation | null;
   result: ToolResult | null;
   authorizedEffect: EffectFingerprint | null;
   observedEffect: EffectFingerprint | null;
@@ -130,6 +143,7 @@ export class EnforcementPoint {
           },
           ignoredModelFields: resolution.ignoredModelFields,
           decision: denyUnresolvable(requestId, resolution.reason),
+          mediation: null,
           result: null,
           authorizedEffect: null,
           observedEffect: null,
@@ -139,6 +153,42 @@ export class EnforcementPoint {
     }
 
     const call = resolution.call;
+
+    // EFFECT MEDIATION, before authorization and therefore before any grant
+    // exists. A denial here means no grant is minted, so there is nothing the
+    // tool layer could spend even if something tried.
+    const mediation = this.cfg.mediator.mediateOperation(
+      this.cfg.session,
+      call.operation,
+      call.operationSha256,
+      now,
+    );
+
+    if (mediation.verdict === 'deny') {
+      return {
+        entry: this.record({
+          ...{
+            requestId,
+            raw,
+            logicalTime: now,
+            entitiesSha256: entities.sha256,
+            operation: call.operation,
+            operationSha256: call.operationSha256,
+            action: call.action,
+            resource: call.resource,
+            context: call.context,
+            ignoredModelFields: call.ignoredModelFields,
+          },
+          decision: denyMediated(requestId, mediation.reason),
+          mediation,
+          result: null,
+          authorizedEffect: null,
+          observedEffect: null,
+        }),
+        result: null,
+      };
+    }
+
     const outcome = this.pdp.authorize({
       requestId,
       principal: this.cfg.session,
@@ -148,6 +198,7 @@ export class EnforcementPoint {
       entities,
       operation: call.operation,
       operationSha256: call.operationSha256,
+      mediation,
     });
 
     const base = {
@@ -168,6 +219,7 @@ export class EnforcementPoint {
         entry: this.record({
           ...base,
           decision: outcome.decision,
+          mediation,
           result: null,
           authorizedEffect: null,
           observedEffect: null,
@@ -180,7 +232,7 @@ export class EnforcementPoint {
     // runs and from the operation alone.
     const authorizedEffect = expectedEffectOf(call.operation);
 
-    const result = executeTool(call.operation, outcome.grant);
+    const result = executeTool(call.operation, outcome.grant, mediation);
 
     // What actually happened, read back out of the fixture world.
     const observedEffect = observeEffect(call.operation);
@@ -199,7 +251,7 @@ export class EnforcementPoint {
     if (result.carriesResourceContent) this.sourceTrust = 'tool_output';
 
     return {
-      entry: this.record({ ...base, decision: outcome.decision, result, authorizedEffect, observedEffect }),
+      entry: this.record({ ...base, decision: outcome.decision, mediation, result, authorizedEffect, observedEffect }),
       result,
     };
   }
@@ -242,6 +294,7 @@ export class EnforcementPoint {
       context: { now },
       ignoredModelFields: [],
       decision,
+      mediation: null,
       result: null,
       authorizedEffect: null,
       observedEffect: null,
@@ -269,6 +322,9 @@ export class EnforcementPoint {
       ...(i.extraEntities ? { extraEntities: i.extraEntities } : {}),
       ignoredModelFields: i.ignoredModelFields,
       decision: i.decision,
+      mediation: i.mediation
+        ? { verdict: i.mediation.verdict, reason: i.mediation.reason, hash: i.mediation.hash }
+        : null,
       toolResult: i.result ? { ok: i.result.ok, summary: i.result.summary } : null,
       authorizedEffect: i.authorizedEffect,
       observedEffect: i.observedEffect,
