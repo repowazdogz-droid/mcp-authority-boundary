@@ -10,7 +10,7 @@ npm run verify
 ```
 
 Node 20.11 or newer. No API key, no network after `npm install`, no other toolchain. You
-should see 24 scenarios, four replay stages all reporting PASS, and 100 passing tests.
+should see 24 scenarios, four replay stages all reporting PASS, and 139 passing tests.
 
 ## 1. Read the policy set first (5 minutes)
 
