@@ -10,7 +10,7 @@ That is not a story about a bug. It is the artifact's result. Authorization assu
 
 ## Abstract
 
-Authorization at an AI agent's tool boundary is usually treated as one property: either the policy engine is in the path or it is not. This artifact separates it into properties that fail independently. A Cedar-enforced Model Context Protocol server mediates six tools across 24 adversarial scenarios, recording every decision in a hash-chained ledger with an independent replay verifier.
+Authorization at an AI agent's tool boundary is usually treated as one property: either the policy engine is in the path or it is not. This artifact separates it into properties that fail independently. A Cedar-enforced Model Context Protocol server mediates six tools across 25 adversarial scenarios, recording every decision in a hash-chained ledger with an independent replay verifier.
 
 The first version passed 66 tests, replayed as VERIFIED, and satisfied a checked complete-mediation invariant, while a 100,000-byte write executed under a 4,096-byte policy limit. The resolver measured the payload as a string and substituted zero bytes for a non-string; the executor coerced the same argument and wrote it. Both read the raw input independently, so the engine authorized a request that did not describe the operation.
 
@@ -27,9 +27,9 @@ The point of this repository is that these are four claims, not one.
 | **A** | **Mediation.** No mediated tool executes without an `allow`. | **Established** |
 | **B** | **Binding.** Execution consumes the same canonical operation Cedar authorized. | **Established.** Did not hold in v1. |
 | **C** | **Policy adequacy.** The policy expresses the authority its author intended. | **Not established, deliberately.** Two live counterexamples retained. |
-| **D** | **Effect verification.** The observed effect matches the authorized operation. | **Established for the fixture tools only.** |
+| **D** | **Effect verification.** The recorded effect matches the authorized operation. | **Not established by the shipped evidence.** Independent fixture read-back exists for `write_document` and `delete_file` only, and the ledger executes neither, so all eight of its stage-4 checks are record-consistency. The read-back is demonstrated for `write_document` in the test suite, and for `delete_file` nowhere — see [L7](docs/LIMITATIONS.md). |
 
-A held in v1 and B did not, which is the whole finding: **the gate can be perfectly enforced and still authorize the wrong thing.** A, B and D holding says nothing about C.
+A held in v1 and B did not, which is the whole finding: **the gate can be perfectly enforced and still authorize the wrong thing.** A and B holding says nothing about C, and says nothing about what an authorized command does outside this boundary — scenario S24, and the section below.
 
 ---
 
@@ -76,7 +76,7 @@ flowchart TD
         E["Cedar decision<br/>allow / deny + determining policy ids<br/>anything else maps to DENY"]
         F["Grant bound to sha256 of the operation<br/>single use, minted only by the PDP"]
         G["Execution<br/>consumes the operation, no raw args"]
-        H["Effect observation<br/>read the world back and compare"]
+        H["Effect record<br/>read back (2 tools) or<br/>derived from the operation (4)"]
     end
 
     subgraph EVIDENCE["EVIDENCE - after the fact, prevents nothing"]
@@ -120,6 +120,8 @@ The gate sits inside the server, in front of tool dispatch, rather than between 
 | Live-session expiry | never fired | witness exhibited | fires, no restart |
 | Revocation flipped on disk | ignored by a running process | witness exhibited | next decision denies |
 
+The three columns are the three tagged states of the repository, not the current head. At head the run is 25 scenarios, 27 ledger entries, 146 tests, four replay stages all PASS: scenario S24 and `test/external-effect.test.ts` were added after the repair and change no earlier column.
+
 Counts are over an authored scenario set written by the same person who wrote the policies. They describe this artifact and estimate nothing about attack prevalence, real-model behaviour, or any other policy set. The measurement frame is in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
 ---
@@ -137,12 +139,60 @@ Counts are over an authored scenario set written by the same person who wrote th
   - **A2**: `forbid-widening-delegation` compares a session only to its immediate parent, so a faithful child of a widened parent inherits authority the root grant never had, and outlives it. The exact policy clause that would close it is written out in `docs/AUDIT.md`, unapplied.
   - **A6**: `DELETE FROM analytics.metrics` is authorized by `permit-read-tier`, because `query_database` is classified read-only and the resolver binds a table without gating on statement class. The class is now recorded and visible in the evidence, and still not enforced.
   - These are not unfinished work. An artifact whose every scenario is a catch would demonstrate the opposite of its own thesis.
-- **Arbitrary real-world side effects.** No shell command runs, no mail is sent, no database is queried. Claim D is scoped to a fixture world with no symlinks, races, partial writes or permissions.
-- **Exhaustive adversarial coverage.** 24 authored scenarios and 32 audit and falsification probes bound the search, not the world. No counterexample found is not no counterexample.
+- **Arbitrary real-world side effects.** No shell command runs, no mail is sent, no database is queried. Claim D is scoped to a fixture world with no symlinks, races, partial writes or permissions; for four of the six tools the recorded effect is derived from the operation rather than read back at all, and the two tools that do read back are never executed in the shipped ledger.
+- **The consequence of an authorized command.** Scenario S24 and the section below.
+- **Exhaustive adversarial coverage.** 25 authored scenarios and 32 audit and falsification probes bound the search, not the world. No counterexample found is not no counterexample.
 - **Production security.** There is no authentication. Session identity is bound from the environment at spawn.
 - **Faithful logging.** A hash chain proves the file was not edited after it was written. It cannot show that the file describes what happened: anything with code execution inside the server can write a consistent chain describing events that never occurred. Truncating the tail leaves a valid prefix, and there is a test asserting exactly that.
 
 ---
+
+## The boundary of the boundary
+
+Scenario **S24** is the second permitted scenario, and it is in the demo output for the same
+reason S18 is: it marks where the claims stop.
+
+`execute_shell` is authorized on a non-production host by `permit-admin-tier`. The command
+string denotes a consequence outside this boundary. `cedarRequestFromOperation` maps
+`execute_shell` to `(action, Mcp::Host, byteLen 0, recipientDomain "")` — the command is not a
+field Cedar receives, so the Cedar request for that call is *identical* to the request for a
+benign command on the same host, and no policy in this set, present or future, can be written
+against the difference. `test/external-effect.test.ts` asserts that identity, asserts that both
+calls draw the same verdict from the real PDP, and asserts that claims A and B hold throughout:
+nothing ran without an `allow`, and execution consumed the operation the grant was minted for.
+The operation digests differ, so binding does separate the two calls — it binds execution to
+the authorized operation, and the authorized operation is the one whose consequence is
+unrepresented.
+
+Nothing in the scenario performs network access. `execute_shell` appends to an in-process array
+and returns `[simulated output]`; the domain is a reserved `.example` name and is never
+resolved. What S24 exhibits is the representation gap, not an effect.
+
+**The underlying limitation is prior work, and none of it is claimed here.** An enforcement
+mechanism cannot constrain what it can neither observe nor control:
+
+- **Schneider**, *Enforceable Security Policies*, TISSEC 3(1), 2000 — execution monitors
+  enforce only safety properties. The biconditional is not his: he states that "the converse —
+  that all safety properties have EM enforcement mechanisms — does not hold".
+- **Basin, Jugé, Klaedtke & Zălinescu**, *Enforceable Security Policies Revisited*, POST 2012 /
+  TISSEC 16(1), 2013 — partitions actions into controllable and only-observable, and
+  characterises enforceability as `(U,O)`-safety: informally, "P is safety in U and bad things
+  are not caused by an only-observable action". The command's consequence is such an action for
+  this boundary.
+- **Khoury & Hallé**, *Runtime Enforcement With Partial Control*, FPS 2015
+  ([arXiv:1508.06525](https://arxiv.org/abs/1508.06525)) — generalises that partition to a
+  lattice of control levels, with file and network operations as the worked examples, and shows
+  the enforceable set grows monotonically as an action is moved to a level the monitor
+  controls. Adding a lower-layer enforcement point is that move.
+- **Ray**, *What Can Be Enforced? A Theory of Certified Runtime Safety for Tool-Using Agents*,
+  2026 ([arXiv:2607.22868](https://arxiv.org/abs/2607.22868)) — the same characterisation for a
+  pre-execution gate on agent tool calls, relative to a fixed vector of oracle predicates: what
+  the gate cannot see, it cannot enforce.
+
+**What this repository adds is an executable demonstration.** S24 and its tests are a running
+instance in which complete mediation and authorization-execution binding both hold, every test
+passes, the four replay stages all report PASS, and the containment inference still does not
+follow. The proposition is not this artifact's; the witness is.
 
 ## Reproduce
 
@@ -155,16 +205,16 @@ npm install
 
 Node 20.11 or newer. No API key, no network after `npm install`, no other toolchain. The run takes about 10 seconds on an M-series laptop.
 
-You should see 24 scenarios, each printing the tool call, the decision, the determining Cedar policy ids and a ledger position; an unmediated baseline showing what those same calls would do without the authorization layer; then four replay stages reporting separately:
+You should see 25 scenarios, each printing the tool call, the decision, the determining Cedar policy ids and a ledger position; an unmediated baseline showing what those same calls would do without the authorization layer; then four replay stages reporting separately:
 
 ```
-chain-integrity      PASS   checked 26  n/a  0  failures 0
-policy-replay        PASS   checked 26  n/a  0  failures 0
-auth-exec-binding    PASS   checked 24  n/a  2  failures 0
-effect-consistency   PASS   checked  7  n/a 19  failures 0
+chain-integrity      PASS   checked 27  n/a  0  failures 0
+policy-replay        PASS   checked 27  n/a  0  failures 0
+auth-exec-binding    PASS   checked 25  n/a  2  failures 0
+effect-consistency   PASS   checked  8  n/a 19  failures 0
 ```
 
-then 100 passing tests. The stages are never collapsed into a single verdict, because a single verdict is what hid A1. Corrupting one recorded `observedEffect` turns effect-consistency red while auth-exec-binding stays green; corrupting one recorded `operation` does the reverse. [docs/QUICKSTART.md](docs/QUICKSTART.md) has the commands.
+then 146 passing tests. The stages are never collapsed into a single verdict, because a single verdict is what hid A1. Corrupting one recorded `observedEffect` turns effect-consistency red while auth-exec-binding stays green; corrupting one recorded `operation` does the reverse. [docs/QUICKSTART.md](docs/QUICKSTART.md) has the commands.
 
 The ledger is byte-identical across runs, so `git status` stays clean after a fresh `./run.sh`.
 
@@ -179,9 +229,10 @@ policies/          Cedar schema, 14 base policies plus a 1-policy revocation
 entities/          sessions, scopes, documents, mailboxes, tables, hosts
 src/               ~2500 lines of code. resolve.ts is the correspondence layer
                    and the place A1 lived; mediation.ts holds the grant machinery.
-test/              100 tests, including 17 audit probes (the original 14
-                   witnesses, several now split into before/after pairs) and a
-                   15-probe post-repair falsification sweep
+test/              146 tests, including 17 audit probes (the original 14
+                   witnesses, several now split into before/after pairs), a
+                   15-probe post-repair falsification sweep, and
+                   external-effect.test.ts, which pins the S24 boundary
 docs/              architecture, threat model, assumptions, limitations,
                    evidence, audit, repair
 evidence/          committed, and regenerated byte-identically by ./run.sh

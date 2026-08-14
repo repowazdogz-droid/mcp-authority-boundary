@@ -78,14 +78,15 @@ a substantially harder problem and this is not an approximation of it.
 
 ## L5. The security property is demonstrated, not proven
 
-**Do not read claims A, B and D as implying C.** The README lists four claims deliberately
+**Do not read claims A and B as implying C or D.** The README lists four claims deliberately
 apart: mediation, authorization binding, policy adequacy, and effect verification. This
-artifact supports A, B and D and explicitly does not support C, and keeps two live
+artifact supports A and B; it explicitly does not support C, and keeps two live
 counterexamples to C (findings A2 and A6) rather than closing them, because an artifact that
-demonstrated only successes would be less useful.
+demonstrated only successes would be less useful; and D is not established by the shipped
+evidence at all (L7).
 
 The property "no sequence of prompts can cause execution of a tool action that Cedar denies"
-is universally quantified over an infinite set. It is not established by running 24
+is universally quantified over an infinite set. It is not established by running 25
 scenarios, and this artifact does not claim to have established it.
 
 What is actually supported, in decreasing order of strength:
@@ -96,7 +97,7 @@ What is actually supported, in decreasing order of strength:
 2. **A ledger-level invariant, checked over every run.** No entry carries a tool result
    without an `allow`; every tool-action `allow` carries a result. Checked at runtime, in
    the metrics, and again by the independent verifier.
-3. **A scenario set.** 24 authored scenarios, all matching their declared outcomes.
+3. **A scenario set.** 25 authored scenarios, all matching their declared outcomes.
 
 A machine-checked proof would need a formalisation of the enforcement point, not just of the
 policy language. That is not in scope here.
@@ -121,8 +122,9 @@ Two consequences worth stating separately:
   implied.
 - **Replay shares the engine, and three of its four stages share more.** Stage 2 shares the
   Cedar build and the classifier; stage 3 shares the request-derivation function; only stage 4
-  compares two things derived by different routes, and even it compares a recorded world
-  observation against a fresh derivation rather than re-observing the world, which is
+  compares two things derived by different routes, and it does so **for two of the six tools,
+  neither of which the shipped ledger ever executes** (L7), and even then it compares a recorded
+  world observation against a fresh derivation rather than re-observing the world, which is
   impossible once the process is gone. The stage table in `EVIDENCE.md` states what each buys.
 
 The check in replay that carries real weight is the one that discards the recorded verdict
@@ -130,7 +132,7 @@ entirely and re-derives it from the recorded request plus the policy files on di
 the verifier holds independently of the log. That is a genuine reconstruction. It is not an
 independent oracle.
 
-## L7. Effects are simulated, and the effect check inherits that
+## L7. Effects are simulated, and for four of six tools the check is not an observation
 
 No real shell command runs, no real mail is sent, no real database is queried. The
 effect-consistency stage reads back an in-process fixture world, so claim D is scoped to
@@ -138,6 +140,54 @@ effect-consistency stage reads back an in-process fixture world, so claim D is s
 real filesystem brings symlinks, races, partial writes and permissions, none of which this
 fixture has. Whether a real tool would honour the operation it was handed is exactly the
 question the fixture cannot answer.
+
+**This entry used to stop there, and stopping there overstated claim D.** The correction is
+recorded rather than applied silently. Claim D is not uniform across the six tools, because
+the two sides of the comparison do not come from different places for all of them:
+
+| Tool | What `observeEffect` reads | Independent of the operation? | Executions in the shipped ledger |
+|---|---|---|---|
+| `write_document` | re-reads the `documents` map | **Yes.** A tool that wrote elsewhere, or wrote something else, is caught | **0** (two denials). Demonstrated instead in `test/external-effect.test.ts` |
+| `delete_file` | checks absence in the `documents` map | **Yes** | **0** (two denials). Demonstrated nowhere |
+| `read_document` | tail of `readLog` | **No** | 5 |
+| `send_email` | tail of `outbox` | **No** | 1 |
+| `execute_shell` | tail of `shellLog` | **No** | 2 |
+| `query_database` | tail of `dbLog` | **No** | 0 (one denial) |
+
+**The right-hand column is the one that decides what claim D is worth, and an earlier draft of
+this entry omitted it.** The two tools with independent read-back are the two the ledger never
+executes: every `write_document` and `delete_file` entry is a denial. So all eight of stage 4's
+checks in the shipped evidence are the weak kind, and the stage establishes nothing about
+independent observation no matter how green it reports. Adding a successful write or delete
+scenario purely to change that would be manufacturing coverage, so the claim is narrowed
+instead.
+
+For the bottom four, `executeTool` appends that log entry *from the operation it was handed*,
+in the same call. So `expectedEffectOf(op)` and `observeEffect(op)` are two derivations of one
+object rather than two views of a world.
+
+That does not make the comparison dead, and an earlier draft of this entry said it did. It
+fires if the tool records something other than what it was authorized to do: mutating
+`executeTool` to log an altered host, recipient or path makes the corresponding scenario fail.
+What it cannot detect is a divergence between that record and a real effect, because for these
+four tools the record is the only world there is. It checks the tool against its own account of
+itself, which is a narrower thing than the two rows above, and it was being reported alongside
+them without the distinction.
+
+`test/external-effect.test.ts` pins both halves: tampering with the `documents` map behind the
+tool's back turns the `write_document` check red, and `observeEffect` on a shell operation that
+was never executed returns the fingerprint of the one that was — it does not read its argument
+at all. Both assertions were mutation-tested: breaking either branch of `observeEffect` fails
+exactly the corresponding test.
+
+**Read claim D as: NOT established by the shipped evidence.** Independent fixture read-back is
+implemented for `write_document` and `delete_file` only; the ledger executes neither, so every
+stage-4 check it contains is consistency of the record with itself. The read-back is
+demonstrated for `write_document` in `test/external-effect.test.ts`, by tampering with the
+`documents` map behind the tool's back and requiring the check to go red, and it is
+demonstrated for `delete_file` nowhere at all. The `effect-consistency` line in the replay
+output and the stage table in `EVIDENCE.md` are worded to match; this is the same distinction
+L6 draws about the ledger, arriving one layer down.
 
 ## L8. One policy set, one entity store, one author
 

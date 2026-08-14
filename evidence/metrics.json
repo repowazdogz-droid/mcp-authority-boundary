@@ -1,8 +1,8 @@
 {
-  "scenarios": 24,
-  "ledgerEntries": 26,
+  "scenarios": 25,
+  "ledgerEntries": 27,
   "decisions": {
-    "allow": 8,
+    "allow": 9,
     "deny": 18
   },
   "denialsByKind": {
@@ -20,7 +20,7 @@
     "permit-delegate-attenuated": 1,
     "forbid-widening-delegation": 1,
     "forbid-shell-on-production-host": 1,
-    "permit-admin-tier": 1,
+    "permit-admin-tier": 2,
     "forbid-revoked-session": 1,
     "forbid-revoked-ancestor": 1,
     "forbid-excessive-delegation-depth": 1,
@@ -34,8 +34,8 @@
   "policiesExercisedAsDetermining": 15,
   "policyCoverage": "15/15",
   "policiesNeverDetermining": [],
-  "executions": 7,
-  "toolAllows": 7,
+  "executions": 8,
+  "toolAllows": 8,
   "mediationInvariantHolds": true,
   "forgedIdentityFieldsIgnored": 4,
   "unmediatedBaselineExecutions": 18

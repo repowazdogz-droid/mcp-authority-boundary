@@ -21,19 +21,19 @@ important half.
 Reproduced verbatim from `evidence/metrics.json` on a clean run:
 
 ```
-scenarios                                    24
-ledger entries                               26
-  allow                                       8
+scenarios                                    25
+ledger entries                               27
+  allow                                       9
   deny                                       18
     explicit-forbid                          12
     no-matching-permit (Cedar default deny)   6
 policy coverage (determining at least once)  15/15
 forged authority fields stripped              4
-tool executions                               7
-tool-action allow decisions                   7
+tool executions                               8
+tool-action allow decisions                   8
 mediation invariant                          HOLDS
 same calls, authorization removed            18 would execute
-tests                                       100 passed
+tests                                       146 passed
 ```
 
 Replay, over the same ledger, in four separately-reported stages. They are never collapsed
@@ -42,15 +42,27 @@ authorization/execution divergence:
 
 ```
 stage                checked  n/a  failures  verdict   establishes
-chain-integrity           26    0         0  PASS      the file has not been edited or reordered
-policy-replay             26    0         0  PASS      the decision is reproducible from the recorded
+chain-integrity           27    0         0  PASS      the file has not been edited or reordered
+policy-replay             27    0         0  PASS      the decision is reproducible from the recorded
                                                        request (shares Cedar build + classifier)
-auth-exec-binding         24    2         0  PASS      the recorded request is what the recorded
+auth-exec-binding         25    2         0  PASS      the recorded request is what the recorded
                                                        operation derives (shares the derivation fn)
-effect-consistency         7   19         0  PASS      the world state observed after execution
-                                                       matches the authorized operation
+effect-consistency         8   19         0  PASS      the recorded effect matches the authorized
+                                                       operation. All 8 are record-consistency: the
+                                                       two tools with an independent world read-back
+                                                       (write_document, delete_file) are never
+                                                       executed in this ledger (LIMITATIONS.md L7)
 verdict  ALL STAGES PASS
 ```
+
+The `effect-consistency` count is the one to read carefully, and reading it carefully makes it
+worth less than it looks. The eight checked entries are `read_document` x5, `execute_shell` x2
+and `send_email` x1 - every one of them a tool whose recorded effect is derived from the
+operation rather than observed. The two tools that do read fixture state back,
+`write_document` and `delete_file`, appear in this ledger only as denials, so they are never
+checked at all. A green `effect-consistency` line here therefore establishes nothing about
+independent observation. `write_document`'s read-back is demonstrated separately in
+`test/external-effect.test.ts`; `delete_file`'s is not demonstrated anywhere.
 
 Negative controls, run because a stage that has only ever passed is uncharacterised. Each
 tamper turns exactly one substantive stage red and leaves the other green, which is what shows
@@ -65,20 +77,20 @@ The ledger is byte-identical across runs. Both the logical clock and the wall cl
 pinned, so the hash chain reproduces exactly:
 
 ```
-sha256(evidence/ledger.jsonl) = 92aeae05964d0e39d2052e2c8bfb101189792953d104cef88642775e451ec464
+sha256(evidence/ledger.jsonl) = 7f2ee4f6894b9b92e8b155f9a88b3fdfa4f3f33ab5c6dc3eea9dd70500b17446
 ```
 
 ## What frame these numbers were measured in
 
 **Target population versus what was observed.** The intended question is about attacks on
-MCP-mediated agents in general. What was observed is 24 scenarios that the author of the
+MCP-mediated agents in general. What was observed is 25 scenarios that the author of the
 policy set also wrote. This is the single largest caveat in the artifact and no other
 caveat comes close. It is a hand-built corpus, not a sample of anything: it was not drawn
 from incident data, from a red-team exercise, or from a benchmark suite. A different author
 would have written different scenarios, and every count here would move.
 
-**Unit of analysis.** One authorization decision, which is one ledger entry. n = 26. The
-scenario count (24) is a different unit and the two are not interchangeable: two scenarios
+**Unit of analysis.** One authorization decision, which is one ledger entry. n = 27. The
+scenario count (25) is a different unit and the two are not interchangeable: two scenarios
 contain two steps each, and S13 is one request evaluated under two policy versions.
 
 **Denominator and exclusions.** The denominator is every step declared in

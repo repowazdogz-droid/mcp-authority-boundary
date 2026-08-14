@@ -1,10 +1,10 @@
 {
   "ledger": "evidence/ledger.jsonl",
-  "entries": 26,
+  "entries": 27,
   "stages": [
     {
       "stage": "chain-integrity",
-      "checked": 26,
+      "checked": 27,
       "notApplicable": 0,
       "failures": 0,
       "verdict": "PASS",
@@ -12,7 +12,7 @@
     },
     {
       "stage": "policy-replay",
-      "checked": 26,
+      "checked": 27,
       "notApplicable": 0,
       "failures": 0,
       "verdict": "PASS",
@@ -20,7 +20,7 @@
     },
     {
       "stage": "auth-exec-binding",
-      "checked": 24,
+      "checked": 25,
       "notApplicable": 2,
       "failures": 0,
       "verdict": "PASS",
@@ -28,11 +28,11 @@
     },
     {
       "stage": "effect-consistency",
-      "checked": 7,
+      "checked": 8,
       "notApplicable": 19,
       "failures": 0,
       "verdict": "PASS",
-      "establishes": "the effect observed in the world after execution matches the authorized operation"
+      "establishes": "the recorded effect matches the authorized operation. Independent world read-back exists only for write_document and delete_file; where this ledger executes neither, every check here is consistency of the record with itself (docs/LIMITATIONS.md L7)"
     }
   ],
   "findings": [],

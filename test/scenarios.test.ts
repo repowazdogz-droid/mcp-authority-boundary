@@ -63,11 +63,18 @@ test('the scenario set covers every declared attack family', () => {
   }
 });
 
-test('exactly one scenario is a negative control, and it ends in ALLOW', () => {
+test('every negative control is permitted, and each marks a different edge', () => {
   const controls = SCENARIOS.filter((s) => s.negativeControl);
-  assert.equal(controls.length, 1);
-  assert.ok(
-    controls[0]!.expect.every((e) => e.decision === 'allow'),
-    'the negative control must be permitted - it marks the edge of the claim, not a catch',
+  // S18: authority versus intent. S24: the tool call versus its external consequence.
+  // Two edges, not one, and neither is a catch.
+  assert.deepEqual(
+    controls.map((s) => s.id),
+    ['S18', 'S24'],
   );
+  for (const c of controls) {
+    assert.ok(
+      c.expect.every((e) => e.decision === 'allow'),
+      `${c.id} must be permitted - a negative control marks the edge of the claim, not a catch`,
+    );
+  }
 });

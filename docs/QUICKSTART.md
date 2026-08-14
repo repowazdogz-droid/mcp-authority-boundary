@@ -10,7 +10,7 @@ npm run verify
 ```
 
 Node 20.11 or newer. No API key, no network after `npm install`, no other toolchain. You
-should see 24 scenarios, four replay stages all reporting PASS, and 139 passing tests.
+should see 25 scenarios, four replay stages all reporting PASS, and 146 passing tests.
 
 ## 1. Read the policy set first (5 minutes)
 
@@ -59,7 +59,8 @@ npm run replay
 This runs four separate stages: chain integrity, policy replay (which discards every recorded
 verdict and re-derives it), authorization-execution binding (which re-derives the Cedar request
 from the recorded canonical operation), and effect consistency (which compares the world state
-observed after execution against the authorized operation). Then break something and watch it
+recorded effect against the authorized operation - a world read-back for write_document and
+delete_file only, see LIMITATIONS.md L7). Then break something and watch it
 fail:
 
 ```bash
@@ -73,15 +74,15 @@ The verifier reports four stages and never collapses them, so you can see which 
 broke. On an unmodified checkout this tamper produces exactly:
 
 ```
-  chain-integrity      FAIL        checked  26  n/a   0  failures 2
-  policy-replay        FAIL        checked  26  n/a   0  failures 1
-  auth-exec-binding    FAIL        checked  24  n/a   2  failures 1
-  effect-consistency   PASS        checked   7  n/a  19  failures 0
+  chain-integrity      FAIL        checked  27  n/a   0  failures 2
+  policy-replay        FAIL        checked  27  n/a   0  failures 1
+  auth-exec-binding    FAIL        checked  25  n/a   2  failures 1
+  effect-consistency   PASS        checked   8  n/a  19  failures 0
   findings 4
     #9 [chain-integrity] hash mismatch: recorded 869abe002aac, recomputed 38216c546240
     #10 [chain-integrity] prevHash 869abe002aac does not match the previous entry's recomputed hash 38216c546240
     #9 [policy-replay] recorded allow, re-decided deny
-    #-1 [auth-exec-binding] 7 executions against 8 tool-action allow decisions
+    #-1 [auth-exec-binding] 8 executions against 9 tool-action allow decisions
 ```
 
 The policy-replay finding is the one that matters. The chain failures only say the file was
@@ -109,17 +110,17 @@ npm run replay
 ```
 
 ```
-  chain-integrity      PASS        checked  26  n/a   0  failures 0
-  policy-replay        NOT CHECKED checked   0  n/a   0  failures 26
+  chain-integrity      PASS        checked  27  n/a   0  failures 0
+  policy-replay        NOT CHECKED checked   0  n/a   0  failures 27
   auth-exec-binding    NOT CHECKED checked   0  n/a   0  failures 0
   effect-consistency   NOT CHECKED checked   0  n/a   0  failures 0
-  findings 26
+  findings 27
     #0 [policy-replay] recorded policy hash 478baf45f1b37a23 but policy files on disk hash to ...
 ```
 
 Every entry is flagged, and the process exits non-zero. Once an entry's recorded policy hash
 does not match the policy on disk, the verifier reports that and skips the remaining per-entry
-checks for it, which is why the three later stages report nothing checked even though 26
+checks for it, which is why the three later stages report nothing checked even though 27
 failures were recorded against policy-replay. The hash on the right depends on which rule you
 appended.
 

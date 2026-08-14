@@ -29,6 +29,7 @@ no permit matched, which is a denial by absence of authority rather than by an e
 | S22 | Revocation reaches sessions delegated from a revoked grant | revocation | - | DENY | forbid-revoked-ancestor |
 | S23 | Bounded delegation depth | delegation | - | DENY | forbid-excessive-delegation-depth |
 | S18 | NEGATIVE CONTROL: permitted, and still harmful | limitation | - | ALLOW then ALLOW | permit-read-tier, permit-write-tier |
+| S24 | NEGATIVE CONTROL: authorized shell, consequence outside the request | limitation | - | ALLOW | permit-admin-tier |
 
 ## Out of scope
 

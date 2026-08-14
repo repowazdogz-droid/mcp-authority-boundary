@@ -36,11 +36,25 @@ import type { CedarContext, LedgerEntry } from './types.js';
  *   operation disagree, which is what tampering or a runtime divergence would
  *   look like. It does not establish that the derivation itself is right.
  *
- *   Stage 4 is the only stage whose two sides come from different places. The
- *   observed side was produced at runtime by reading the fixture world back
- *   after execution; the authorized side is recomputed here from the operation.
- *   The world observation cannot be repeated after the fact - the process is
- *   gone - so replay checks the recorded observation against a freshly derived
+ *   Stage 4 is the only stage whose two sides CAN come from different places,
+ *   and it does so for two of the six tools. For write_document and delete_file
+ *   the observed side was produced at runtime by re-reading the fixture world
+ *   after execution, so a tool that wrote elsewhere would be caught. For
+ *   read_document, send_email, execute_shell and query_database the observed
+ *   side is the tail of a log that executeTool appended FROM the operation, so
+ *   the two sides are one object derived twice; that comparison still fires if
+ *   the tool records something other than what it was authorized to do, but it
+ *   cannot witness a real effect.
+ *
+ *   READ THE PER-TOOL MIX BEFORE READING THE COUNT. In the shipped ledger the
+ *   two read-back tools are never executed - every write_document and
+ *   delete_file entry is a denial - so all of stage 4's checks there are the
+ *   record-consistency kind, and a green line establishes nothing about
+ *   independent observation. See docs/LIMITATIONS.md L7.
+ *
+ *   The authorized side is recomputed here from the operation. The world
+ *   observation cannot be repeated after the fact - the process is gone - so
+ *   replay checks the recorded observation against a freshly derived
  *   expectation. The live differential runs inside EnforcementPoint.handle,
  *   which throws on mismatch.
  */
@@ -228,7 +242,7 @@ function main(): void {
     'auth-exec-binding':
       'the recorded Cedar request is the one the recorded operation derives (shares the derivation function with the producer)',
     'effect-consistency':
-      'the effect observed in the world after execution matches the authorized operation',
+      'the recorded effect matches the authorized operation. Independent world read-back exists only for write_document and delete_file; where this ledger executes neither, every check here is consistency of the record with itself (docs/LIMITATIONS.md L7)',
   };
 
   const stages: StageReport[] = (Object.keys(counts) as StageName[]).map((stage) => {

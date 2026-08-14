@@ -43,8 +43,12 @@ The property under test, stated as the four separable claims the README lists:
 > **B (binding).** The operation that executes is the same canonical, validated
 > `ResolvedOperation` the Cedar request was derived from, verified at execution time by digest.
 >
-> **D (effect).** For the fixture tools, the state transition observed after execution matches
-> the one the authorized operation specifies.
+> **D (effect).** NOT established by the shipped evidence. `write_document` and `delete_file`
+> read fixture state back after execution, and the other four tools derive the recorded effect
+> from the operation rather than observing it. The ledger executes neither read-back tool, so
+> every stage-4 check it contains is consistency of the record with itself. The read-back is
+> demonstrated for `write_document` in `test/external-effect.test.ts` and for `delete_file`
+> nowhere — see [LIMITATIONS.md](LIMITATIONS.md), L7.
 >
 > **C (policy adequacy) is NOT claimed.** Findings A2 and A6 in `AUDIT.md` are live
 > counterexamples: the implementation is correct with respect to a policy that does not fully
@@ -96,6 +100,17 @@ make S18 fail, by forbidding any egress after an untrusted read regardless of de
 and the cost would be an agent that cannot email the user about a document it just read. The
 artifact keeps S18 permitted and visible rather than tuning the policy until every scenario
 is a catch.
+
+**S24** is the second permitted scenario, and it marks a different edge. An `execute_shell`
+call is authorized on a non-production host by `permit-admin-tier`. The command string denotes
+a consequence outside this boundary. `cedarRequestFromOperation` maps `execute_shell` to
+`(action, Host, byteLen 0, recipientDomain "")`, so the command is not a field Cedar receives
+and no policy in this set can be written against it: the Cedar request for that call is
+identical to the one for a benign command on the same host. Claims A and B hold throughout —
+nothing ran without an `allow`, and execution consumed the operation the grant was minted for.
+What does not follow is containment of the denoted consequence. S18 is about authority versus
+intent for one principal; S24 is about the tool call versus its external effect. See
+"The boundary of the boundary" in the README for why the underlying limitation is prior work.
 
 ## Position of each mechanism
 

@@ -42,6 +42,7 @@ A matrix of only denials proves nothing, because a gate that denies everything p
 | S15 | Delegation that narrows every dimension | ALLOW |
 | S20 | Shell on a non-production host at admin tier | ALLOW |
 | **S18** | **Injection that stays inside the grant** | **ALLOW** |
+| **S24** | **Authorized shell whose command denotes a consequence outside the request** | **ALLOW** |
 
 ## Out of scope, and not counted as caught
 
