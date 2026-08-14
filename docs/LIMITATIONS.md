@@ -134,6 +134,9 @@ independent oracle.
 
 ## L7. Effects are simulated, and for four of six tools the check is not an observation
 
+**Released v1.0.0 overstated this claim; the correction is in the README, under the claim
+table.** `test/evidence-composition.test.ts` guards against the combination recurring.
+
 No real shell command runs, no real mail is sent, no real database is queried. The
 effect-consistency stage reads back an in-process fixture world, so claim D is scoped to
 "the observed fixture state transition matches the authorized operation" and no further. A

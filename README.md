@@ -29,6 +29,16 @@ The point of this repository is that these are four claims, not one.
 | **C** | **Policy adequacy.** The policy expresses the authority its author intended. | **Not established, deliberately.** Two live counterexamples retained. |
 | **D** | **Effect verification.** The recorded effect matches the authorized operation. | **Not established by the shipped evidence.** Independent fixture read-back exists for `write_document` and `delete_file` only, and the ledger executes neither, so all eight of its stage-4 checks are record-consistency. The read-back is demonstrated for `write_document` in the test suite, and for `delete_file` nowhere — see [L7](docs/LIMITATIONS.md). |
 
+### Correction to v1.0.0
+
+Released v1.0.0 stated claim D as *"Effect verification. The observed effect matches the authorized operation — Established for the fixture tools only"*, and its replay output reported that *"the effect observed in the world after execution matches the authorized operation"*. Both overstated the evidence.
+
+Independent fixture read-back is implemented only for `write_document` and `delete_file`, and the v1.0.0 ledger executed neither: its seven stage-4 checks were `read_document` ×5, `execute_shell` ×1 and `send_email` ×1. Every stage-4 check shipped in v1.0.0 was therefore record-consistency, not independent effect observation.
+
+Claims A, B and C are unaffected and stand as released. Corrected 2026-08-14. Current claim D status is in the table above; the detail is in [docs/LIMITATIONS.md L7](docs/LIMITATIONS.md), and `test/evidence-composition.test.ts` now fails the build if this combination recurs.
+
+---
+
 A held in v1 and B did not, which is the whole finding: **the gate can be perfectly enforced and still authorize the wrong thing.** A and B holding says nothing about C, and says nothing about what an authorized command does outside this boundary — scenario S24, and the section below.
 
 ---
@@ -120,7 +130,7 @@ The gate sits inside the server, in front of tool dispatch, rather than between 
 | Live-session expiry | never fired | witness exhibited | fires, no restart |
 | Revocation flipped on disk | ignored by a running process | witness exhibited | next decision denies |
 
-The three columns are the three tagged states of the repository, not the current head. At head the run is 25 scenarios, 27 ledger entries, 146 tests, four replay stages all PASS: scenario S24 and `test/external-effect.test.ts` were added after the repair and change no earlier column.
+The three columns are the three tagged states of the repository, not the current head. At head the run is 25 scenarios, 27 ledger entries, 149 tests, four replay stages all PASS: scenario S24, `test/external-effect.test.ts` and `test/evidence-composition.test.ts` were added after the repair and change no earlier column.
 
 Counts are over an authored scenario set written by the same person who wrote the policies. They describe this artifact and estimate nothing about attack prevalence, real-model behaviour, or any other policy set. The measurement frame is in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
@@ -214,7 +224,7 @@ auth-exec-binding    PASS   checked 25  n/a  2  failures 0
 effect-consistency   PASS   checked  8  n/a 19  failures 0
 ```
 
-then 146 passing tests. The stages are never collapsed into a single verdict, because a single verdict is what hid A1. Corrupting one recorded `observedEffect` turns effect-consistency red while auth-exec-binding stays green; corrupting one recorded `operation` does the reverse. [docs/QUICKSTART.md](docs/QUICKSTART.md) has the commands.
+then 149 passing tests. The stages are never collapsed into a single verdict, because a single verdict is what hid A1. Corrupting one recorded `observedEffect` turns effect-consistency red while auth-exec-binding stays green; corrupting one recorded `operation` does the reverse. [docs/QUICKSTART.md](docs/QUICKSTART.md) has the commands.
 
 The ledger is byte-identical across runs, so `git status` stays clean after a fresh `./run.sh`.
 
@@ -229,10 +239,12 @@ policies/          Cedar schema, 14 base policies plus a 1-policy revocation
 entities/          sessions, scopes, documents, mailboxes, tables, hosts
 src/               ~2500 lines of code. resolve.ts is the correspondence layer
                    and the place A1 lived; mediation.ts holds the grant machinery.
-test/              146 tests, including 17 audit probes (the original 14
+test/              149 tests, including 17 audit probes (the original 14
                    witnesses, several now split into before/after pairs), a
-                   15-probe post-repair falsification sweep, and
-                   external-effect.test.ts, which pins the S24 boundary
+                   15-probe post-repair falsification sweep,
+                   external-effect.test.ts, which pins the S24 boundary, and
+                   evidence-composition.test.ts, which guards claim D against
+                   the ledger's actual per-tool composition
 docs/              architecture, threat model, assumptions, limitations,
                    evidence, audit, repair
 evidence/          committed, and regenerated byte-identically by ./run.sh
