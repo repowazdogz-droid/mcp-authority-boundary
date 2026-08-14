@@ -78,8 +78,8 @@ broke. On an unmodified checkout this tamper produces exactly:
   auth-exec-binding    FAIL        checked  24  n/a   2  failures 1
   effect-consistency   PASS        checked   7  n/a  19  failures 0
   findings 4
-    #9 [chain-integrity] hash mismatch: recorded 236199cebf57, recomputed 511618ca2fa1
-    #10 [chain-integrity] prevHash 236199cebf57 does not match the previous entry's recomputed hash 511618ca2fa1
+    #9 [chain-integrity] hash mismatch: recorded 869abe002aac, recomputed 38216c546240
+    #10 [chain-integrity] prevHash 869abe002aac does not match the previous entry's recomputed hash 38216c546240
     #9 [policy-replay] recorded allow, re-decided deny
     #-1 [auth-exec-binding] 7 executions against 8 tool-action allow decisions
 ```
