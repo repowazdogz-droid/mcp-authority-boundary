@@ -23,7 +23,7 @@ import type { EntityUid } from './types.js';
  *
  * The session identity comes from the environment at spawn time, not from the
  * protocol and not from any tool argument. Real deployments would bind it during
- * an authenticated handshake; that is assumption A2 in docs/THREAT_MODEL.md.
+ * an authenticated handshake; that is assumption A2 in docs/ASSUMPTIONS.md.
  */
 /**
  * Session identity is REQUIRED and has no default.
