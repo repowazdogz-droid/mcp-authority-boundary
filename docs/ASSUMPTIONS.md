@@ -18,14 +18,26 @@ claimed as a result of this repository.
 
 ## A2. Session establishment is authenticated
 
-The principal comes from the environment at server spawn (`MCP_SESSION_ID`). **Authentication
-is not implemented.** A real deployment would bind the session during an authenticated
-handshake and the binding would be the security-critical step.
+The principal is read from `MCP_SESSION_ID` in the server's process environment at startup,
+and is supplied by whoever launches the process. **Authenticated session establishment is
+assumed, not implemented.** A real deployment would bind the session during an authenticated
+handshake and that binding would be the security-critical step. Nothing in this repository
+performs it, and possession of the launch path is therefore equivalent to possession of any
+session named in it.
 
-What the artifact does establish is the narrower property that matters for the research
-question: given a bound session, nothing the model emits can change which session a decision
-is made under. Scenario S10 and `test/regression.test.ts` exercise that. Whether the binding
-itself is trustworthy is assumed here, not shown.
+The artifact demonstrates enforcement only **after** a session identity has been supplied at
+process launch. Within that boundary it establishes the narrower property that matters for the
+research question: given a supplied session, the enforcement point fixes that identity for its
+lifetime and nothing the model emits can change which session a decision is made under.
+Scenario S10, `test/regression.test.ts` and `test/session-establishment.test.ts` exercise that.
+Whether the supplied identity is genuine is assumed here, not shown.
+
+Session identity is required and has no default. An absent or blank `MCP_SESSION_ID` refuses
+startup with exit code 2, and an unrecognised one fails closed at the first decision. Until
+2026-08-17 the server defaulted to `sess-alice-root` when the variable was unset, which meant a
+launcher that omitted one environment variable ran as the highest-authority session in the
+entity store rather than failing. That default is removed. Removing it does not authenticate
+anything; it removes one hazard — a missing identity silently becoming the most privileged one.
 
 ## A3. The host process is not compromised
 

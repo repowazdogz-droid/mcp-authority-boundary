@@ -37,6 +37,14 @@ Independent fixture read-back is implemented only for `write_document` and `dele
 
 Claims A, B and C are unaffected and stand as released. Corrected 2026-08-14. Current claim D status is in the table above; the detail is in [docs/LIMITATIONS.md L7](docs/LIMITATIONS.md), and `test/evidence-composition.test.ts` now fails the build if this combination recurs.
 
+### Correction to v1.0.0: session establishment
+
+Released v1.0.0 read the principal as `process.env['MCP_SESSION_ID'] ?? 'sess-alice-root'`. A launcher that omitted the variable therefore did not fail; it ran as `sess-alice-root`, the highest-authority session in the entity store. An unknown session id already failed closed, so absence was the one input routed to maximum privilege rather than to refusal.
+
+`MCP_SESSION_ID` is now required and has no default: an absent or blank value refuses startup with exit code 2, and an unrecognised one still fails closed at the first decision. **This does not add authentication, and it does not contain a hostile local actor who can spawn the process.** Whoever launches the server still chooses the session identity, and possession of the launch path remains equivalent to possession of any session named in it. Assumption A2 stands as written; the trust boundary is in [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md).
+
+Claims A, B, C and D are unaffected. Corrected 2026-08-17. 155/155 tests pass, including startup refusal for missing and blank identities, and unchanged enforcement under explicitly supplied admin and delegated sessions; `test/session-establishment.test.ts` fails the build if the default returns.
+
 ---
 
 A held in v1 and B did not, which is the whole finding: **the gate can be perfectly enforced and still authorize the wrong thing.** A and B holding says nothing about C, and says nothing about what an authorized command does outside this boundary — scenario S24, and the section below.

@@ -25,7 +25,37 @@ import type { EntityUid } from './types.js';
  * protocol and not from any tool argument. Real deployments would bind it during
  * an authenticated handshake; that is assumption A2 in docs/THREAT_MODEL.md.
  */
-const sessionId = process.env['MCP_SESSION_ID'] ?? 'sess-alice-root';
+/**
+ * Session identity is REQUIRED and has no default.
+ *
+ * This used to read `process.env['MCP_SESSION_ID'] ?? 'sess-alice-root'`. That
+ * default was a fail-open: `sess-alice-root` is the highest-authority session in
+ * the entity store, so a launcher that omitted one environment variable got
+ * admin rather than an error. An unknown session id already fails closed - Cedar
+ * cannot evaluate the policies and the fail-closed mapping denies - so absence
+ * was the single input routed to maximum privilege instead of to refusal.
+ *
+ * Refusing here does NOT authenticate the binding. Whoever spawns this process
+ * still chooses the value, which is assumption A2 in docs/ASSUMPTIONS.md and is
+ * unchanged. It removes one specific hazard: a missing identity silently
+ * becoming the most privileged one.
+ *
+ * Exit code 2 is distinct from Node's generic 1 so a supervisor can tell
+ * "misconfigured" from "crashed" without parsing the message.
+ */
+const rawSessionId = process.env['MCP_SESSION_ID'];
+if (rawSessionId === undefined || rawSessionId.trim() === '') {
+  process.stderr.write(
+    'mcp-authority-boundary: refusing to start: MCP_SESSION_ID is required and must be ' +
+      'non-empty. There is no default session; a missing identity is a configuration ' +
+      'error, not an invitation to assume one.\n',
+  );
+  process.exit(2);
+}
+// Deliberately NOT trimmed. `" sess-alice-root "` is not silently normalised
+// onto the admin session; it is an unknown id and takes the existing fail-closed
+// path through Cedar. Only wholly-absent and wholly-blank are special-cased.
+const sessionId = rawSessionId;
 const session: EntityUid = { type: 'Mcp::Session', id: sessionId };
 const clockBase = Number(process.env['MCP_CLOCK'] ?? '2000');
 // Advance the logical clock by this much per decision. 0 keeps the demo

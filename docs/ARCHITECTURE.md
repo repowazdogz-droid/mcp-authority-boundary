@@ -108,7 +108,7 @@ therefore derived from what the tool would actually do:
 
 | Field | Derived how | Attack it closes |
 |---|---|---|
-| `principal` | The session bound to the transport at spawn | S10: forged `principal` in the arguments |
+| `principal` | Read from `MCP_SESSION_ID` in the process environment at startup; supplied by whoever launches the process. Required, with no default: an absent or blank value refuses startup. Authentication of that binding is assumed, not implemented — see [A2](ASSUMPTIONS.md) | S10: forged `principal` in the arguments |
 | `action` | Fixed mapping from tool name, declared in the schema | Tool cannot be silently reclassified |
 | `resource` | Path canonicalised, then looked up in the entity store | S11: `corp/public/../finance/...` |
 | `context.byteLen` | Measured from the payload to be written | A declared `length` argument is not consulted |

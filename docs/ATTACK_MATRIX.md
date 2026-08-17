@@ -15,7 +15,7 @@ classes mean, and what is deliberately not in the table.
 | S07 | Indirect prompt injection via document content | Turn-level taint plus egress forbid | `forbid-external-egress-after-untrusted-read` |
 | S08 | Tool misuse under a read-only grant | Capability tier and scope | none (no permit matched) |
 | S09 | Confused deputy acting "on behalf of" a third party | Classification gate on the resource | `forbid-restricted-document-below-admin` |
-| S10 | Privilege escalation by forged arguments | Identity fields stripped; principal bound to transport | `forbid-restricted-document-below-admin` |
+| S10 | Privilege escalation by forged arguments | Identity fields stripped and recorded; the principal is never read from the request | `forbid-restricted-document-below-admin` |
 | S11 | Cross-resource access by path traversal | Canonicalisation before resource resolution | none (no permit matched) |
 | S12 | PII table read below admin tier | Data-attribute gate | `forbid-pii-table-below-admin` |
 | S13b | Continued use of a revoked session (control plane) | Policy deployed as a new version | `revoke-session-analyst-delegated` |
