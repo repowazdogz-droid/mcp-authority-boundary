@@ -250,6 +250,9 @@ L1 is about the gap between authority and intent. L11 is about the gap between p
 authority and composed authority. An artifact that closed L1 completely would still have
 this one, and vice versa. Do not cite either as covering the other.
 
+Externally occupied: ACP (arXiv:2603.18829, preprint) enforces behavioural properties over
+execution traces because stateless per-request engines cannot. Do not re-derive as novel.
+
 **Three limitations of that layer are load-bearing and are repeated here** so that reading
 this file alone cannot leave a reader with a stronger impression than the artifact supports:
 
