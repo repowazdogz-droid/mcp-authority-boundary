@@ -33,7 +33,7 @@ tool executions                               8
 tool-action allow decisions                   8
 mediation invariant                          HOLDS
 same calls, authorization removed            18 would execute
-tests                                       149 passed
+tests                                       155 passed
 ```
 
 Replay, over the same ledger, in four separately-reported stages. They are never collapsed

@@ -232,7 +232,7 @@ auth-exec-binding    PASS   checked 25  n/a  2  failures 0
 effect-consistency   PASS   checked  8  n/a 19  failures 0
 ```
 
-then 149 passing tests. The stages are never collapsed into a single verdict, because a single verdict is what hid A1. Corrupting one recorded `observedEffect` turns effect-consistency red while auth-exec-binding stays green; corrupting one recorded `operation` does the reverse. [docs/QUICKSTART.md](docs/QUICKSTART.md) has the commands.
+then 155 passing tests. The stages are never collapsed into a single verdict, because a single verdict is what hid A1. Corrupting one recorded `observedEffect` turns effect-consistency red while auth-exec-binding stays green; corrupting one recorded `operation` does the reverse. [docs/QUICKSTART.md](docs/QUICKSTART.md) has the commands.
 
 The ledger is byte-identical across runs, so `git status` stays clean after a fresh `./run.sh`.
 
@@ -247,7 +247,7 @@ policies/          Cedar schema, 14 base policies plus a 1-policy revocation
 entities/          sessions, scopes, documents, mailboxes, tables, hosts
 src/               ~2500 lines of code. resolve.ts is the correspondence layer
                    and the place A1 lived; mediation.ts holds the grant machinery.
-test/              149 tests, including 17 audit probes (the original 14
+test/              121 tests, including 17 audit probes (the original 14
                    witnesses, several now split into before/after pairs), a
                    15-probe post-repair falsification sweep,
                    external-effect.test.ts, which pins the S24 boundary, and

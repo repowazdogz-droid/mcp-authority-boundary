@@ -22,7 +22,7 @@ From the repository root:
 npm test
 ```
 
-Expect 139 tests, 0 failures - 105 for the per-call boundary (including five
+Expect 155 tests, 0 failures - 121 for the per-call boundary (including five
 negative controls on mandatory effect mediation) and 34 for this layer (12 pure
 checker, 15 mediator, 7 acceptance tests T1-T5). This layer has
 no build or test scaffolding of its own; it compiles with the repository's
