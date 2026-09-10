@@ -33,6 +33,29 @@ Those are the trust boundary. Each is stated as a premise in
 [ASSUMPTIONS.md](ASSUMPTIONS.md), because an adversary who crosses any one of them defeats
 the artifact entirely and no amount of policy will help.
 
+## A second, weaker model: executor compromise (detection only)
+
+The hardening campaign in `experiments/hardening` labels every case with a `threatModel`.
+`caller-only` is the adversary above. `executor-compromise` is a different and stronger one:
+the tool executor, the runtime, or the ledger files have been modified. Concretely, the
+campaign's `shadow`, `no-write`, `extra-write`, `transient-extra-write` and `transient-revert`
+cases replace the file backend the executor writes through; `prepare-failure` and
+`completion-failure` inject I/O faults into the ledger; `D8-tail-loss`, `D8-resealed-prefix`
+and `D7-rehashed-mediation` edit the ledger or seal files after the run.
+
+That adversary is **outside the trust boundary stated above**: the list of things the
+adversary is NOT able to do includes modifying the server binary and writing to the ledger
+except through the enforcement point. **No prevention is claimed under executor compromise.**
+What the campaign measures there is detection only: whether the replay verifier, the
+in-series effect comparison in `enforce.ts`, and the separate observer process notice the
+divergence afterwards. One case is a declared miss (`transient-extra-write`: an unauthorized
+file written and removed before the run ends is invisible to final-state observation), and
+`extra-write` passes replay and is caught only by the observer. The per-model, per-outcome
+counts are printed by `npm run experiment:hardening` and recorded under `threatModels` in
+`RESULTS.json`. The trace-conformance check (`formal/Conformance.lean`) flags the `shadow` and
+`no-write` traces as non-conforming for the same reason, and its runner requires that they
+stay flagged.
+
 ## What is defended
 
 The property under test, stated as the four separable claims the README lists:

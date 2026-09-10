@@ -66,7 +66,7 @@ const oldExtracted = [...comma.matchAll(/\bfrom\s+([a-zA-Z_][\w.]*)/gi)].map(m =
 assert.deepEqual(oldExtracted, ['analytics.metrics']);
 assert.deepEqual(oracle.results.at(-1).reads, ['analytics.metrics', 'crm.customers']);
 assert.equal(parseSelect(comma), null);
-const sqlReport = { acceptedCases: queries.length, sqlite: oracle.sqlite, mismatches: 0,
+const sqlReport = { acceptedCases: queries.length, threatModel: 'caller-only', sqlite: oracle.sqlite, mismatches: 0,
   scope: 'enumerated SELECT subset; SQLite table-access and result oracle, not all dialects',
   negativeControl: { query: comma, oldResolver: oldExtracted, sqliteReads: oracle.results.at(-1).reads,
     repaired: 'REFUSE' } };
@@ -104,6 +104,20 @@ const specs = [
   { name: 'D8-resealed-prefix', calls: [write(notes, 'first'), write(roadmap, 'second')], tamper: 'reseal', replay: 'FAILED', world: 'DIVERGENCE' },
   { name: 'D7-rehashed-mediation', calls: [write(notes, 'first')], tamper: 'mediation', replay: 'FAILED', world: 'AGREE' },
 ];
+// THREAT MODEL LABEL. "caller-only" is the talk's adversary: fully in control of
+// the model, the client and the arguments, but unable to modify the executor,
+// the runtime, the ledger file or the host (docs/THREAT_MODEL.md). Every case
+// that mutates the executor (shadow, no-write, extra-write, transient-*), injects
+// a runtime fault (prepare/completion failure) or tampers with the ledger/seal
+// files after the fact (D7, D8) is "executor-compromise": no prevention is
+// claimed there, only what the replay verifier and the observer detect.
+const threatModelOf = spec => spec.mutation || spec.tamper ? 'executor-compromise' : 'caller-only';
+for (const spec of specs) {
+  spec.threatModel = threatModelOf(spec);
+  spec.threatDetail = spec.tamper ? `post-hoc ${spec.tamper} tampering of ledger/seal files`
+    : ['completion-failure', 'prepare-failure'].includes(spec.mutation) ? 'runtime I/O fault injection'
+    : spec.mutation ? 'executor mutation' : 'adversarial caller only';
+}
 const fileResults = [];
 for (const spec of specs) {
   const directory = join(output, spec.name), root = join(directory, 'world');
@@ -146,7 +160,8 @@ for (const spec of specs) {
   save(join(directory, 'observer.json'), observation);
   assert.equal(verification.verdict, spec.replay, spec.name);
   assert.equal(observation.verdict, spec.world, spec.name);
-  fileResults.push({ name: spec.name, replay: verification.verdict, observer: observation.verdict,
+  fileResults.push({ name: spec.name, threatModel: spec.threatModel, threatDetail: spec.threatDetail,
+    replay: verification.verdict, observer: observation.verdict,
     ...(spec.knownMiss ? { knownMiss: spec.knownMiss } : {}),
     outcomes, findings: verification.findings.map(f => f.detail) });
 }
@@ -171,9 +186,24 @@ for (const directory of ['src', 'test', 'scripts', 'formal', 'policies', 'polici
 sourceFiles.push('package.json', 'package-lock.json', 'entities/entities.json', 'formal/lean-toolchain',
   'formal/vectors.json', 'docs/REPAIR.md', 'docs/THREAT_MODEL.md');
 const sourceHashes = Object.fromEntries(sourceFiles.sort().map(p => [p, hash(readFileSync(join(repo, p)))]));
+// Counts per threat model and per (replay, observer) outcome. The SQL corpus is
+// 240 caller-only cases with one outcome; the file cases are listed individually.
+const threatModels = {};
+for (const f of fileResults) {
+  const m = threatModels[f.threatModel] ??= { fileCases: 0, sqlCases: 0, outcomes: {} };
+  m.fileCases += 1;
+  const key = `replay=${f.replay} observer=${f.observer}${f.knownMiss ? ' (knownMiss)' : ''}`;
+  m.outcomes[key] = (m.outcomes[key] ?? 0) + 1;
+}
+threatModels['caller-only'].sqlCases = queries.length;
+threatModels['caller-only'].outcomes['sql: decision=allow replay=ALL STAGES PASS oracle=match'] = queries.length;
+for (const [model, m] of Object.entries(threatModels)) {
+  console.log(`threat model ${model}: ${m.fileCases} file cases, ${m.sqlCases} SQL cases`);
+  for (const [outcome, n] of Object.entries(m.outcomes)) console.log(`  ${n}  ${outcome}`);
+}
 const report = { generatedAt: new Date().toISOString(), output, node: process.version,
   platform: process.platform, gitHead: run('git', ['rev-parse', 'HEAD']).trim(), sourceHashes,
-  sql: sqlReport, files: fileResults, symlinkControl: 'PASS',
+  sql: sqlReport, files: fileResults, threatModels, symlinkControl: 'PASS',
   scope: 'local experiment with real files, separate observer process and controller-held pre-tamper anchor; shared host and author; no cryptographic machine independence',
   limitations: ['final-state observation misses transient effects outside the record (measured: transient-extra-write); a reverted recorded write is caught (measured: transient-revert)',
     'file adapter assumes the experiment owner controls directory topology during execution',
