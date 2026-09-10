@@ -1,4 +1,4 @@
-{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/mediation.test.js"],"pid":97417,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:02:42.833Z"}
+{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/mediation.test.js"],"pid":98326,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:08:26.143Z"}
 {"seq":0,"kind":"refuse","requestId":null,"grantId":null,"executedOpDigest":"004def9fb26197c66d301aaa5abcb36734be7771578b0ab329540b2f46a770de","reason":"not-issued"}
 {"seq":1,"kind":"refuse","requestId":null,"grantId":null,"executedOpDigest":"004def9fb26197c66d301aaa5abcb36734be7771578b0ab329540b2f46a770de","reason":"not-issued"}
 {"seq":2,"kind":"refuse","requestId":null,"grantId":null,"executedOpDigest":"004def9fb26197c66d301aaa5abcb36734be7771578b0ab329540b2f46a770de","reason":"not-issued"}

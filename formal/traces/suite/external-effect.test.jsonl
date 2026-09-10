@@ -1,4 +1,4 @@
-{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/external-effect.test.js"],"pid":97409,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:02:39.816Z"}
+{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/external-effect.test.js"],"pid":98312,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:08:22.294Z"}
 {"seq":0,"kind":"authorize","requestId":"sess-alice-root@0#0","decision":"allow","denialKind":null,"grantId":0,"op":{"digest":"9db1219c3bb8a1dd2d8292831740f52b8ce234dbf85a5b93e63a31cb1a871780","resource":"build-01","byteLen":0},"request":{"resource":"build-01","byteLen":0}}
 {"seq":1,"kind":"execute","requestId":"sess-alice-root@0#0","grantId":0,"executedOpDigest":"9db1219c3bb8a1dd2d8292831740f52b8ce234dbf85a5b93e63a31cb1a871780"}
 {"seq":2,"kind":"observe","requestId":"sess-alice-root@0#0","executedOpDigest":"9db1219c3bb8a1dd2d8292831740f52b8ce234dbf85a5b93e63a31cb1a871780","authorizedEffect":"2551c86dad3a332cd59223c30d10a582854c522279e4af33555b6d7ba134e895","observedEffect":"2551c86dad3a332cd59223c30d10a582854c522279e4af33555b6d7ba134e895","match":true}

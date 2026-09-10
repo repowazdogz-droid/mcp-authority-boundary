@@ -1,2 +1,2 @@
-{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/src/server.js"],"pid":97437,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:02:45.727Z"}
+{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/src/server.js"],"pid":98346,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:08:29.501Z"}
 {"seq":0,"kind":"authorize","requestId":"sess-analyst-delegated@0#0","decision":"deny","denialKind":"explicit-forbid","grantId":null,"op":{"digest":"b67add630d7bf861319ec7a2ba9434ae7ae559ed0c4b0c65dc55a469868c9b15","resource":"corp/hr/salaries.csv","byteLen":0},"request":{"resource":"corp/hr/salaries.csv","byteLen":0}}

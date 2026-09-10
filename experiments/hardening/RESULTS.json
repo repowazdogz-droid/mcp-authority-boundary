@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-10T13:07:15.138Z",
-  "output": "/Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-xmQc8o",
+  "generatedAt": "2026-09-10T13:08:43.850Z",
+  "output": "/Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-Qn4aiJ",
   "node": "v26.8.1",
   "platform": "darwin",
-  "gitHead": "97c832df11727fbece331a96e1bd0b072d8298e6",
+  "gitHead": "4e1f07449e5932160c9b43ef1e721d6710cb679f",
   "sourceHashes": {
     "containment/src/deployments.ts": "b5f370987cbc81f2f63d79e6ff981b54379c096c67544dc8f2f6594de30be935",
     "containment/src/fixture.ts": "b9ae9550078fd1d37d60223bdc3664142d5f14020a507c862e5d73584c7626e3",
@@ -243,7 +243,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-xmQc8o/shadow/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-Qn4aiJ/shadow/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -262,7 +262,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-xmQc8o/no-write/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-Qn4aiJ/no-write/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -294,7 +294,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-xmQc8o/completion-failure/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-Qn4aiJ/completion-failure/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },

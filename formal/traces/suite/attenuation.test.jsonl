@@ -1,4 +1,4 @@
-{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/attenuation.test.js"],"pid":97404,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:02:39.468Z"}
+{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/attenuation.test.js"],"pid":98310,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:08:21.913Z"}
 {"seq":0,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"allow"}
 {"seq":1,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
 {"seq":2,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}

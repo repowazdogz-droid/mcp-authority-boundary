@@ -1,4 +1,4 @@
-{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/grant-binding.test.js"],"pid":97414,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:02:42.145Z"}
+{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/grant-binding.test.js"],"pid":98322,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:08:25.005Z"}
 {"seq":0,"kind":"authorize","requestId":"grant-binding","decision":"allow","denialKind":null,"grantId":0,"op":{"digest":"79676e7903b6c0e5f43f10fe24178bb33d47e18aca36229799c5fcb7e7eb7dc9","resource":"corp/public/notes.md","byteLen":2},"request":{"resource":"corp/public/notes.md","byteLen":2}}
 {"seq":1,"kind":"execute","requestId":"grant-binding","grantId":0,"executedOpDigest":"79676e7903b6c0e5f43f10fe24178bb33d47e18aca36229799c5fcb7e7eb7dc9"}
 {"seq":2,"kind":"authorize","requestId":"grant-binding","decision":"allow","denialKind":null,"grantId":1,"op":{"digest":"79676e7903b6c0e5f43f10fe24178bb33d47e18aca36229799c5fcb7e7eb7dc9","resource":"corp/public/notes.md","byteLen":2},"request":{"resource":"corp/public/notes.md","byteLen":2}}

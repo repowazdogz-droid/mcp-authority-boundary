@@ -1,4 +1,4 @@
-{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/src/server.js"],"pid":97434,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:02:45.293Z"}
+{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/src/server.js"],"pid":98343,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:08:29.003Z"}
 {"seq":0,"kind":"authorize","requestId":"sess-alice-root@0#0","decision":"allow","denialKind":null,"grantId":0,"op":{"digest":"b67add630d7bf861319ec7a2ba9434ae7ae559ed0c4b0c65dc55a469868c9b15","resource":"corp/hr/salaries.csv","byteLen":0},"request":{"resource":"corp/hr/salaries.csv","byteLen":0}}
 {"seq":1,"kind":"execute","requestId":"sess-alice-root@0#0","grantId":0,"executedOpDigest":"b67add630d7bf861319ec7a2ba9434ae7ae559ed0c4b0c65dc55a469868c9b15"}
 {"seq":2,"kind":"observe","requestId":"sess-alice-root@0#0","executedOpDigest":"b67add630d7bf861319ec7a2ba9434ae7ae559ed0c4b0c65dc55a469868c9b15","authorizedEffect":"5dc811ae714f3a12a38d1bf120ab51f88f7a66d1b3194a0ff8bb5dfbf64e81b0","observedEffect":"5dc811ae714f3a12a38d1bf120ab51f88f7a66d1b3194a0ff8bb5dfbf64e81b0","match":true}
