@@ -79,6 +79,30 @@ exhaustive sweep found the gap.
 
 Absence and wrong-type are now distinguished explicitly (`'body' in clean ? … : ''`).
 
+### Measured count of validation sites (added 2026-09-10)
+
+The "nine places, two missed" sentence above was written from memory of the repair session.
+Counting the sites in `src/resolve.ts` from the commits themselves gives the following. Only two
+commits touch that file before the 2026-09-10 snapshot: `631196d` (v1) and `c3f7ade` (the
+repair). **The `send_email` null fix is inside `c3f7ade`; there is no separate commit for it**, so
+the "applied then missed then fixed" sequence happened in the working tree before the repair was
+committed and is not recoverable from git history.
+
+| Revision | What was counted | Count | Lines |
+|---|---|---|---|
+| `631196d` v1 | type checks in `resolve.ts` that **reject** a non-string | 4 | 51 (path), 65 (sql), 136 (to), 146 (host) |
+| `631196d` v1 | sites in `resolve.ts` that **coerce** a non-string | 2 | 126 (`content` → `''`), 141 (`String(body ?? '')`) |
+| `631196d` v1 | `String()` coercions in `tools.ts`, the executor's second reading of the raw args | 4 | 97, 110, 115, 120 |
+| `c3f7ade` repair | `asString(...)` call sites in `resolve.ts` (the single reject-never-coerce validator) | **9** | 84, 117, 225, 244, 252, 254, 270, 274, 282 |
+| `c3f7ade` repair | of those nine, sites that additionally distinguish an absent field from an explicit `null` (`'x' in clean ? … : ''`) | **2** | 252 (body), 254 (subject) |
+| snapshot `d08b6be` | `asString(...)` call sites in `resolve.ts` after the SQL grammar replaced the regex extractor | 8 | 85, 217, 236, 244, 246, 262, 266, 274 |
+
+So the honest statement is: the repair introduced nine `asString` sites, and two of them (the
+optional `send_email` fields) are the ones where `?? ''` had silently accepted `null`; the two are
+among the nine, not in addition to them. The counts above are text measurements over the named
+revisions (`git show <rev>:src/resolve.ts | grep -n asString`), not a claim about behaviour; the
+behaviour is what `F1` in `test/falsification.test.ts` measures.
+
 ## Findings left open in the original repair (historical)
 
 The later hardening pass closes A2 and A6. The text below records the scope of the
