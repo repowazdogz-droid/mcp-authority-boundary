@@ -1,0 +1,13 @@
+{
+  "source": "formal/Boundary.lean",
+  "scope": "shared test vectors evaluated by Lean over the model's definitions; not a refinement proof",
+  "vectors": [
+    {"kind": "budget", "resource": 7, "byteLen": 0, "allowed": true},
+    {"kind": "budget", "resource": 7, "byteLen": 3, "allowed": true},
+    {"kind": "budget", "resource": 7, "byteLen": 4096, "allowed": true},
+    {"kind": "budget", "resource": 7, "byteLen": 4097, "allowed": false},
+    {"kind": "budget", "resource": 7, "byteLen": 100000, "allowed": false},
+    {"kind": "trace", "name": "single-execution", "request": {"kind": "budget", "resource": 7, "byteLen": 3, "allowed": true}, "executionIds": [0], "executions": 1, "nodup": true, "reachableUnder": "Step (the example after legacy_size_mismatch)"},
+    {"kind": "trace", "name": "reuse-mutant-double-spend", "request": {"kind": "budget", "resource": 7, "byteLen": 3, "allowed": true}, "executionIds": [0, 0], "executions": 2, "nodup": false, "reachableUnder": "ReuseStep only (reuse_mutant_has_bad_trace); not reachable under Step"}
+  ]
+}

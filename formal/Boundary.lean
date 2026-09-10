@@ -136,6 +136,66 @@ theorem truncation_can_hide_completion :
     ∃ (executions completions : List Grant), executions ≠ [] ∧ completions = [] := by
   exact ⟨[granted], [], by simp, rfl⟩
 
+-- Shared test vectors, exported for test/formal-vectors.test.ts.
+--
+-- Each vector is a concrete evaluation of THIS model's definitions, computed by
+-- the Lean evaluator and written as JSON when this file is checked. The
+-- TypeScript test feeds the same inputs through src/ and requires the same
+-- verdicts. That is a shared-vector check between two independent
+-- implementations of the same small examples; it is NOT a refinement proof and
+-- establishes nothing about inputs outside the list.
+def boolStr (b : Bool) : String := if b then "true" else "false"
+def natsJson (xs : List Nat) : String := "[" ++ ", ".intercalate (xs.map toString) ++ "]"
+
+def budgetVector (r : Request) : String :=
+  "{\"kind\": \"budget\", \"resource\": " ++ toString r.resource ++
+  ", \"byteLen\": " ++ toString r.byteLen ++
+  ", \"allowed\": " ++ boolStr (budget r) ++ "}"
+
+def singleTrace : State := ⟨1, [granted], [0], [granted]⟩
+def reuseTrace : State := ⟨1, [granted], [0, 0], [granted, granted]⟩
+
+def traceVector (name : String) (s : State) (reachableUnder : String) : String :=
+  let ids := s.executions.map Grant.id
+  "{\"kind\": \"trace\", \"name\": \"" ++ name ++
+  "\", \"request\": " ++ budgetVector granted.request ++
+  ", \"executionIds\": " ++ natsJson ids ++
+  ", \"executions\": " ++ toString s.executions.length ++
+  ", \"nodup\": " ++ boolStr (decide ids.Nodup) ++
+  ", \"reachableUnder\": \"" ++ reachableUnder ++ "\"}"
+
+def vectorsJson : String :=
+  "{\n  \"source\": \"formal/Boundary.lean\",\n" ++
+  "  \"scope\": \"shared test vectors evaluated by Lean over the model's definitions; not a refinement proof\",\n" ++
+  "  \"vectors\": [\n    " ++
+  ",\n    ".intercalate [
+    budgetVector ⟨7, 0⟩,
+    budgetVector (requestOf small),
+    budgetVector ⟨7, 4096⟩,
+    budgetVector ⟨7, 4097⟩,
+    budgetVector ⟨7, 100000⟩,
+    traceVector "single-execution" singleTrace "Step (the example after legacy_size_mismatch)",
+    traceVector "reuse-mutant-double-spend" reuseTrace "ReuseStep only (reuse_mutant_has_bad_trace); not reachable under Step"
+  ] ++ "\n  ]\n}\n"
+
+-- The single-execution trace is reachable under Step; the double-spend trace is
+-- reachable only under the mutant. Both facts are theorems above; these two
+-- lines pin the concrete states the vectors serialise to those theorems.
+example : Reachable budget singleTrace := by
+  apply Reachable.next (s := ⟨1, [granted], [], []⟩)
+  · exact Reachable.next Reachable.initial (Step.authorize {} granted rfl rfl (by decide))
+  · exact Step.execute _ granted (by simp) (by simp [granted])
+example : ReuseReachable budget reuseTrace := by
+  apply ReuseReachable.next (s := ⟨1, [granted], [0], [granted]⟩)
+  · apply ReuseReachable.next (s := ⟨1, [granted], [], []⟩)
+    · exact ReuseReachable.next ReuseReachable.initial
+        (ReuseStep.normal (Step.authorize {} granted rfl rfl (by decide)))
+    · exact ReuseStep.execute _ granted (by simp)
+  · exact ReuseStep.execute _ granted (by simp)
+
+#eval IO.FS.writeFile "formal/vectors.json" vectorsJson
+#eval IO.println vectorsJson
+
 #print axioms execution_has_recorded_allow
 #print axioms grants_execute_at_most_once
 #print axioms legacy_size_mismatch
