@@ -13,6 +13,7 @@
 //
 // On refusal nothing is exported and no file is created.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -67,8 +68,19 @@ if (allowed) {
   if (stored !== undefined) {
     const dest = join(effectDir, TARGET);
     mkdirSync(dirname(dest), { recursive: true });
+    // Hash the in-memory value BEFORE the write and the file bytes AFTER it,
+    // read back from disk, so the export can be checked to be byte-identical
+    // rather than assumed to be (test/observer-export.test.ts asserts it).
+    const memorySha256 = createHash('sha256').update(stored, 'utf8').digest('hex');
     writeFileSync(dest, stored);
-    exported = { path: TARGET, bytes: Buffer.byteLength(stored, 'utf8') };
+    const fileSha256 = createHash('sha256').update(readFileSync(dest)).digest('hex');
+    exported = {
+      path: TARGET,
+      bytes: Buffer.byteLength(stored, 'utf8'),
+      memorySha256,
+      fileSha256,
+      byteIdentical: memorySha256 === fileSha256,
+    };
   }
 }
 
