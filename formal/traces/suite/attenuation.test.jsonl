@@ -1,0 +1,17 @@
+{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/test/attenuation.test.js"],"pid":97404,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:02:39.468Z"}
+{"seq":0,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"allow"}
+{"seq":1,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":2,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":3,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":4,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":5,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":6,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":7,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":8,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":9,"kind":"delegate","requestId":"sess-writer-delegated@0#0","decision":"deny"}
+{"seq":10,"kind":"delegate","requestId":"sess-analyst-delegated@0#0","decision":"deny"}
+{"seq":11,"kind":"delegate","requestId":"sess-alice-root@0#0","decision":"allow"}
+{"seq":12,"kind":"authorize","requestId":"sess-rogue-widened@0#0","decision":"deny","denialKind":"explicit-forbid","grantId":null,"op":{"digest":"004def9fb26197c66d301aaa5abcb36734be7771578b0ab329540b2f46a770de","resource":"corp/public/roadmap.md","byteLen":0},"request":{"resource":"corp/public/roadmap.md","byteLen":0}}
+{"seq":13,"kind":"authorize","requestId":"sess-rogue-widened@0#1","decision":"deny","denialKind":"explicit-forbid","grantId":null,"op":{"digest":"f2fa50002c132546ef82a0483d140d38fa1d9dde63b6c3877a8e48ded482a46f","resource":"corp/public/notes.md","byteLen":1},"request":{"resource":"corp/public/notes.md","byteLen":1}}
+{"seq":14,"kind":"authorize","requestId":"sess-rogue-widened@0#2","decision":"deny","denialKind":"explicit-forbid","grantId":null,"op":{"digest":"ebe90797f0a26328d8e9e82176be796c01cf35426d4666d398faa63e62c82e68","resource":"corp/public/notes.md","byteLen":0},"request":{"resource":"corp/public/notes.md","byteLen":0}}
+{"seq":15,"kind":"authorize","requestId":"sess-rogue-widened@0#3","decision":"deny","denialKind":"explicit-forbid","grantId":null,"op":{"digest":"d2ffc1a9ec884c6467e168cfe45f341f6c9a811eb12f06fc04ceb3294e26b641","resource":"analytics.metrics","byteLen":0},"request":{"resource":"analytics.metrics","byteLen":0}}

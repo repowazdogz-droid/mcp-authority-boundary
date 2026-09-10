@@ -1,0 +1,92 @@
+{
+  "file-worker-97450.jsonl": {
+    "case": "bytes-0",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97453.jsonl": {
+    "case": "bytes-4095",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97456.jsonl": {
+    "case": "bytes-4096",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97459.jsonl": {
+    "case": "bytes-4097-refused",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97468.jsonl": {
+    "case": "utf8-boundary",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97472.jsonl": {
+    "case": "utf8-oversize-refused",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97476.jsonl": {
+    "case": "write-delete",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97480.jsonl": {
+    "case": "shadow",
+    "mutation": "shadow",
+    "threatModel": "executor-compromise"
+  },
+  "file-worker-97483.jsonl": {
+    "case": "no-write",
+    "mutation": "no-write",
+    "threatModel": "executor-compromise"
+  },
+  "file-worker-97486.jsonl": {
+    "case": "extra-write",
+    "mutation": "extra-write",
+    "threatModel": "executor-compromise"
+  },
+  "file-worker-97493.jsonl": {
+    "case": "completion-failure",
+    "mutation": "completion-failure",
+    "threatModel": "executor-compromise"
+  },
+  "file-worker-97500.jsonl": {
+    "case": "prepare-failure",
+    "mutation": "prepare-failure",
+    "threatModel": "executor-compromise"
+  },
+  "file-worker-97503.jsonl": {
+    "case": "transient-extra-write",
+    "mutation": "transient-extra-write",
+    "threatModel": "executor-compromise"
+  },
+  "file-worker-97512.jsonl": {
+    "case": "transient-revert",
+    "mutation": "transient-revert",
+    "threatModel": "executor-compromise"
+  },
+  "file-worker-97518.jsonl": {
+    "case": "D8-tail-loss",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97521.jsonl": {
+    "case": "D8-resealed-prefix",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker-97524.jsonl": {
+    "case": "D7-rehashed-mediation",
+    "mutation": null,
+    "threatModel": "caller-only"
+  },
+  "file-worker.jsonl": {
+    "case": "multiple-writes",
+    "mutation": null,
+    "threatModel": "caller-only"
+  }
+}

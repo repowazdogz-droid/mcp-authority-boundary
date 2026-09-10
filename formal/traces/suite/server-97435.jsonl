@@ -1,0 +1,2 @@
+{"kind":"header","argv":["/Users/warre/mcp-authority-boundary/dist/src/server.js"],"pid":97435,"cwd":"/Users/warre/mcp-authority-boundary","startedAt":"2026-09-10T13:02:45.440Z"}
+{"seq":0,"kind":"authorize","requestId":"sess-analyst-delegated@0#0","decision":"deny","denialKind":"no-matching-permit","grantId":null,"op":{"digest":"06ad73b9a0c30b81367972e34a7e87b1a02cbfa856b23510f799f5602c45ded3","resource":"corp/finance/q3-forecast.md","byteLen":1},"request":{"resource":"corp/finance/q3-forecast.md","byteLen":1}}

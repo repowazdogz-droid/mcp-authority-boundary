@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-10T08:53:02.066Z",
-  "output": "/Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-k9IiIz",
+  "generatedAt": "2026-09-10T13:02:55.865Z",
+  "output": "/Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-O9PhrA",
   "node": "v26.8.1",
   "platform": "darwin",
-  "gitHead": "e29b6660da32dec74c82824ad5d8eb7dac76315f",
+  "gitHead": "de90b2335383e13ce0b493aa0f52e008b98d7f5c",
   "sourceHashes": {
     "containment/src/deployments.ts": "b5f370987cbc81f2f63d79e6ff981b54379c096c67544dc8f2f6594de30be935",
     "containment/src/fixture.ts": "b9ae9550078fd1d37d60223bdc3664142d5f14020a507c862e5d73584c7626e3",
@@ -26,15 +26,17 @@
     "experiments/independent-observer/run-all-local.sh": "bc9c76e3c242274bf5978095879888ef70e2d20697e97b14c167c128898e82fe",
     "experiments/independent-observer/run-sut.mjs": "8e3aa790d16178cb7b78b101e3566a1c5769228482284225ed958c6dedac9fb9",
     "formal/Boundary.lean": "68258ec169ae6ea7429d0af3d008f8e6203c20e0a48599cf241ec7e82b412998",
+    "formal/Conformance.lean": "30a9eef2e5adf26934db6532458013068c73de8322351f6c602a4ad74852a381",
     "formal/lean-toolchain": "3aac669c7a910ec2389f4e4f921b605adf6ebf2d1e0c9b9cd0be4d33f3f5db71",
     "formal/vectors.json": "94373db6ed1fc42317c5121fe07c717c5b4cdba1cdd773631d2e3f80bb92e820",
     "package-lock.json": "6a706e469ae7ecddeaeba4eb71529b334c6bec11473e74dd9751933e89e30104",
-    "package.json": "e3229d554f0c53cee6575cb23a156bb8e55ec58f0f9cd4f1c3a5de238fd97704",
+    "package.json": "1d30ff12bb92dbd777bcee428f4c8ae74cbf2b19fb6cc2a9cceb05ac0dfb76b9",
     "policies/00-least-privilege.cedar": "3b3a59c31fc84dd5138cce41a6fba82097bf8234855a03f7f7fe6faa103b9694",
     "policies/10-delegation.cedar": "28ffed69a57f9bb4a22b0914867b2b574f6e896e6ac30a5ec4a33575d78d060c",
     "policies/20-guardrails.cedar": "ccd8a9a055387ed747edde5a98c7b1b2ca8765feb52bfed8c971766676905b92",
     "policies/mcp.cedarschema": "d5f42b305962fea8ac06f0d689c2d0d5438584fee42dada452b3bc49649e3bc6",
     "policies/overlay-revocation/90-revoke-analyst.cedar": "7e492baa67f3d3b77616c4fe8e6ede7c489f8cb5b2fc3deb4812b916500bbc80",
+    "scripts/check-conformance.mjs": "220fd774bb329ba75ba76c475df536726d74c3b76456c90add0f78ad1cc378b0",
     "scripts/check-formal.mjs": "162037d4380c43a5de61f51f9e7fcfb18013c8a8c4706d013d2098b06a2733b5",
     "scripts/manifest-digest.mjs": "b628236165475c6ee8155ffb1d402482e34c1cbf1428ee643513027733544991",
     "scripts/screenshot.mjs": "0938092fdfcc695d48f0ba97c98161f9a31c178c7d53b3d664639116355b3cad",
@@ -42,11 +44,11 @@
     "src/canonical.ts": "bb732705a8bafbd1dd8099bc7d89a619ebd22c02d60bfba3e7724345ede597a1",
     "src/client.ts": "759a7a5fdae86435869c309133ca52c0a2e97cf9f11e585a621d7d3fe8485d80",
     "src/demo.ts": "d8ca89f49b444048902315d9bad4fff80060fe711fd990189bc24e110c2d7a76",
-    "src/enforce.ts": "1d3edcc616f980d0ea9832649303c281a71f291402c6b1ddef5ac4a0bf348bc6",
+    "src/enforce.ts": "e2b160c4d9e190e77e21807ceb0168bd1c924c1afdbd97db2d27b45514ebcb9c",
     "src/ledger.ts": "48131b3944359c71aac7f4e4a880fab5c1bb7ac5d86a5f76a704f7d628c18570",
-    "src/mediation.ts": "f277fb223625f1aae31d8b037dd94adfaff73749114e543b1b86be32d1132b98",
+    "src/mediation.ts": "f5fda4948f15414d859ffeb3a208b1683049b8f98d6ff4dba3b0a15b52bf399e",
     "src/metrics.ts": "729a12c77019e262f714f2be53aa63a424ef94f4daf07ac07e66619dbaa9fc15",
-    "src/pdp.ts": "b5c28e14aa91076e15add07709d91b8be5c15b68b082443b0ee5bdb55655b7c9",
+    "src/pdp.ts": "4b7282470ae6aec32e7c7fce7e529fb7eb6543d1ad7ddbd0b1553199d15b4677",
     "src/policy.ts": "7071fbc697868e8d3b7274fe23a962e8a009df27d54e1f966e93c30fa8e94fc4",
     "src/rawclient.ts": "02da604a4a7d8a6291cc5e6c2f08221f66897f9308eeffbf4f987ad633b54957",
     "src/replay.ts": "df9c5b8875bf0af3babd1f05d9ee42bdb7c9a68ae466c171b2d466b32ace8b57",
@@ -55,6 +57,7 @@
     "src/server.ts": "6fce3fc4063b88ed189bf1339c595903aae7bc4c299387be413c6b31bca0a69f",
     "src/sql.ts": "770c289477249361d815457b3d1415867d78e1b362463d4f3978f7cfec156aa8",
     "src/tools.ts": "7638984794841f10f0edfac55795022435d9afb59d127dd96e60de3a39c5fcac",
+    "src/trace.ts": "5e5c53d8008c162a2a23980da46fec1707aea5f3401ec26e23b77d12a0a72c8f",
     "src/types.ts": "c065f583c1252ba75ee6091d072f69d8cf9026fa9488451256b152177c7253f0",
     "test/adversarial.test.ts": "fb74041824071a9f7061d98a3d2b60643d14292fd0070f8234ed21910eb6aa5e",
     "test/attenuation.test.ts": "5ae348624e4d2a9cd71fe859fa82e7b0dbc27cc9e7bedbca89c0452a7830dadb",
@@ -68,7 +71,7 @@
     "test/hardening.test.ts": "5189cf1b8008e0027cde1e0a70cc6d66ef49f7367ef46540aed96998b6619776",
     "test/helper.ts": "5cfa7b4ea274a7e110cf962fb0a81496d4560c1203bdb2d6ca732a6f7f947933",
     "test/injection.test.ts": "a14094ffc40fa14f519f6e81cccfff6391ca00ed688982e417e328cdb1e56ad4",
-    "test/mediation.test.ts": "ce8449ce622d8fb2e980ac55a272c5957aaa98708980fde048da85b7d8808462",
+    "test/mediation.test.ts": "5d837d8ac367b541f60bf712205c5c484b3065200eecce25f2672d30835b7909",
     "test/observer-export.test.ts": "fae6556b4bcb0f11707559d18b03e7e707b773f3d1f4e5d752fe0b977cd2c1c7",
     "test/policy-update.test.ts": "1529fe0455c3f7b9c635afca0fa11208d42d37bc4c5038a10cf5e693ab725d52",
     "test/regression.test.ts": "02ba004442363eaa0a1e33e2780555e6b1a8798317c17a89aa1ff1a55c851f13",
@@ -216,7 +219,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-k9IiIz/shadow/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-O9PhrA/shadow/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -233,7 +236,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-k9IiIz/no-write/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-O9PhrA/no-write/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -261,7 +264,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-k9IiIz/completion-failure/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-O9PhrA/completion-failure/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },

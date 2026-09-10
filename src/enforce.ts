@@ -5,6 +5,8 @@ import { executeTool, expectedEffectOf, observeEffect, effectsMatch, type ToolRe
 import type { EffectMediation, EffectMediator } from './mediation.js';
 import type { EntityStore, LoadedPolicy } from './policy.js';
 import { engineVersions } from './policy.js';
+import { sha256Canonical } from './canonical.js';
+import { traceEvent } from './trace.js';
 import type { Ledger, UnchainedEntry } from './ledger.js';
 import type {
   CedarContext,
@@ -247,6 +249,17 @@ export class EnforcementPoint {
     // What actually happened, read back out of the fixture world.
     const observedEffect = observeEffect(call.operation);
 
+    // Emitted BEFORE the divergence check so that a divergence, if one ever
+    // occurs, is in the trace and not only in the exception.
+    traceEvent({
+      kind: 'observe',
+      requestId,
+      executedOpDigest: call.operationSha256,
+      authorizedEffect: sha256Canonical(authorizedEffect),
+      observedEffect: sha256Canonical(observedEffect),
+      match: effectsMatch(authorizedEffect, observedEffect),
+    });
+
     if (!effectsMatch(authorizedEffect, observedEffect)) {
       // Not reachable by any input found so far. It is a throw rather than a
       // logged warning because an execution that diverged from its authorization
@@ -296,6 +309,8 @@ export class EnforcementPoint {
       entities,
       extraEntities: [child],
     });
+
+    traceEvent({ kind: 'delegate', requestId, decision: decision.decision });
 
     return this.record({
       requestId,

@@ -21,6 +21,10 @@ The repair binds execution to one validated immutable operation. Later hardening
 ## Current hardening experiment
 
 Run `npm test`, `npm run test:formal`, and `npm run experiment:hardening`.
+`npm run test:conformance` runs the suite and the hardening campaign with `MAB_TRACE=1`
+and has Lean check every emitted grant transition against the transition system in
+`formal/Boundary.lean` (`formal/Conformance.lean`). That is a trace check over the runs
+taken, not a refinement proof; its header says exactly what it does and does not cover.
 The [experiment guide](experiments/hardening/README.md) explains the controls and trust boundaries.
 [RESULTS.json](experiments/hardening/RESULTS.json) records the latest measured outcomes and source hashes.
 Historical tables below refer to their named commits; they are not measurements of the edited tree.

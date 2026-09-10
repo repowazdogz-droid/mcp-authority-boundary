@@ -4,3 +4,4 @@ dist/
 probe*.mjs
 run/
 experiments/hardening/runs/
+evidence/traces/

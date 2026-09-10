@@ -1,4 +1,5 @@
 import { sha256Canonical } from './canonical.js';
+import { traceEvent, TRACE_ENABLED, type RefusalCode } from './trace.js';
 import type { EntityUid, ResolvedOperation } from './types.js';
 
 /**
@@ -82,6 +83,8 @@ export function permitAllMediator(): EffectMediator {
 }
 
 export class ExecutionGrant {
+  /** Position in this process's mint order; the Lean model's grant id. */
+  readonly mintSeq: number;
   readonly requestId: string;
   readonly operationSha256: string;
   /** Digest of the mediation record that cleared this operation's effect. */
@@ -91,6 +94,7 @@ export class ExecutionGrant {
 
   constructor(
     guard: symbol,
+    mintSeq: number,
     requestId: string,
     operationSha256: string,
     mediationSha256: string,
@@ -102,6 +106,7 @@ export class ExecutionGrant {
         'ExecutionGrant may only be minted by the policy decision point after an allow',
       );
     }
+    this.mintSeq = mintSeq;
     this.requestId = requestId;
     this.operationSha256 = operationSha256;
     this.mediationSha256 = mediationSha256;
@@ -117,6 +122,7 @@ const issued = new WeakSet<ExecutionGrant>();
 /** Grants already spent, keyed on the capability object rather than on a name. */
 const spent = new WeakSet<ExecutionGrant>();
 let spentTotal = 0;
+let minted = 0;
 
 export type Minter = (
   requestId: string,
@@ -135,6 +141,7 @@ function mint(
 ): ExecutionGrant {
   const g = new ExecutionGrant(
     PDP_ONLY,
+    minted++,
     requestId,
     operationSha256,
     mediationSha256,
@@ -162,6 +169,16 @@ export function claimMinter(): Minter {
   return mint;
 }
 
+/** Emit the refusal to the trace (when MAB_TRACE=1), then throw. */
+function refuse(code: RefusalCode, message: string, grant: unknown, operation: ResolvedOperation): never {
+  if (TRACE_ENABLED) {
+    const known = grant instanceof ExecutionGrant && issued.has(grant) ? grant : null;
+    traceEvent({ kind: 'refuse', requestId: known?.requestId ?? null, grantId: known?.mintSeq ?? null,
+      executedOpDigest: sha256Canonical(operation), reason: code });
+  }
+  throw new Error(message);
+}
+
 /**
  * Called by the tool layer before it does anything. Throws rather than returns.
  *
@@ -176,23 +193,21 @@ export function consumeGrant(
   mediation?: EffectMediation,
 ): ExecutionGrant {
   if (!(grant instanceof ExecutionGrant) || !issued.has(grant)) {
-    throw new Error('refusing to execute: no grant issued by the policy decision point');
+    refuse('not-issued', 'refusing to execute: no grant issued by the policy decision point', grant, operation);
   }
 
   // MEDIATION IS MANDATORY. Three separate refusals, because there are three
   // separate ways to be handed something that looks like clearance and is not.
   if (mediation === undefined) {
-    throw new Error(
+    refuse('no-mediation',
       'refusing to execute: no effect mediation presented. Every operation must be ' +
         'mediated; a deployment that does not want effect containment configures ' +
-        'permitAllMediator(), it does not omit the record',
-    );
+        'permitAllMediator(), it does not omit the record', grant, operation);
   }
   if (grant.mediationSha256 !== mediation.hash) {
-    throw new Error(
+    refuse('mediation-binding',
       `refusing to execute: grant is bound to mediation ${grant.mediationSha256.slice(0, 12)}, ` +
-        `but the record presented digests to ${mediation.hash.slice(0, 12)}`,
-    );
+        `but the record presented digests to ${mediation.hash.slice(0, 12)}`, grant, operation);
   }
 
   if (mediation.hash !== sha256Canonical({
@@ -200,7 +215,7 @@ export function consumeGrant(
     verdict: mediation.verdict,
     reason: mediation.reason,
   })) {
-    throw new Error('refusing to execute: mediation content does not match its hash');
+    refuse('mediation-hash', 'refusing to execute: mediation content does not match its hash', grant, operation);
   }
 
   const digest = sha256Canonical(operation);
@@ -211,28 +226,26 @@ export function consumeGrant(
   // things. The record names the operation it judged, and this is where that
   // name is made to matter.
   if (mediation.operationSha256 !== digest) {
-    throw new Error(
+    refuse('mediation-linkage',
       `refusing to execute: mediation clears operation ${mediation.operationSha256.slice(0, 12)}, ` +
-        `but the operation presented digests to ${digest.slice(0, 12)}`,
-    );
+        `but the operation presented digests to ${digest.slice(0, 12)}`, grant, operation);
   }
   if (mediation.verdict !== 'allow') {
-    throw new Error(
-      `refusing to execute: the effect mediator returned ${mediation.verdict} (${mediation.reason})`,
-    );
+    refuse('mediation-deny',
+      `refusing to execute: the effect mediator returned ${mediation.verdict} (${mediation.reason})`, grant, operation);
   }
 
   if (grant.operationSha256 !== digest) {
-    throw new Error(
+    refuse('grant-binding',
       `refusing to execute: grant authorises operation ${grant.operationSha256.slice(0, 12)}, ` +
-        `but the operation presented digests to ${digest.slice(0, 12)}`,
-    );
+        `but the operation presented digests to ${digest.slice(0, 12)}`, grant, operation);
   }
   if (spent.has(grant)) {
-    throw new Error(`refusing to execute: grant ${grant.requestId} already spent`);
+    refuse('spent', `refusing to execute: grant ${grant.requestId} already spent`, grant, operation);
   }
   spent.add(grant);
   spentTotal += 1;
+  traceEvent({ kind: 'execute', requestId: grant.requestId, grantId: grant.mintSeq, executedOpDigest: digest });
   return grant;
 }
 

@@ -3,6 +3,7 @@ import type { LoadedPolicy, EntityStore } from './policy.js';
 import { claimMinter, type EffectMediation, type ExecutionGrant } from './mediation.js';
 import { resolveCall } from './resolve.js';
 import { canonicalJson, sha256Canonical } from './canonical.js';
+import { opView, traceEvent } from './trace.js';
 
 /** The PDP claims the sole minting capability at module load. See mediation.ts. */
 const mintGrant = claimMinter();
@@ -125,23 +126,39 @@ export class Pdp {
         canonicalJson(resolved.call.action) !== canonicalJson(input.action) ||
         canonicalJson(resolved.call.resource) !== canonicalJson(input.resource) ||
         canonicalJson(resolved.call.context) !== canonicalJson(input.context)) {
-      return { decision: this.deny(input, 'request-validation-failure', [],
-        ['authorization request does not match the canonical operation']), grant: null };
+      const decision = this.deny(input, 'request-validation-failure', [],
+        ['authorization request does not match the canonical operation']);
+      this.traceAuthorize(input, decision, null);
+      return { decision, grant: null };
     }
     const decision = this.decide(input);
     if (decision.decision === 'deny') {
+      this.traceAuthorize(input, decision, null);
       return { decision: decision as Decision & { decision: 'deny' }, grant: null };
     }
-    return {
-      decision: decision as Decision & { decision: 'allow' },
-      grant: mintGrant(
-        input.requestId,
-        input.operationSha256,
-        input.mediation.hash,
-        input.resource,
-        this.policy.version.sha256,
-      ),
-    };
+    const grant = mintGrant(
+      input.requestId,
+      input.operationSha256,
+      input.mediation.hash,
+      input.resource,
+      this.policy.version.sha256,
+    );
+    this.traceAuthorize(input, decision, grant);
+    return { decision: decision as Decision & { decision: 'allow' }, grant };
+  }
+
+  /** MAB_TRACE=1 only. The request view is what Cedar was handed; the op view is
+   *  recomputed from the operation's own fields in trace.ts. */
+  private traceAuthorize(input: AuthorizeInput, decision: Decision, grant: ExecutionGrant | null): void {
+    traceEvent({
+      kind: 'authorize',
+      requestId: input.requestId,
+      decision: decision.decision,
+      denialKind: decision.denialKind,
+      grantId: grant ? grant.mintSeq : null,
+      op: opView(input.operation, input.operationSha256),
+      request: { resource: input.resource.id, byteLen: input.context.byteLen },
+    });
   }
 
   private deny(
