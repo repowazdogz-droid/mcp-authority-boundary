@@ -1,15 +1,109 @@
+# Verify the hardening branch on a machine that is not the author's.
+#
+# Three jobs, independent of each other:
+#   implementation  npm ci; npm test; npm run experiment:hardening (RESULTS.json uploaded)
+#   counterexample  the independent-observer procedure, three roles as separate
+#                   processes against pristine 631196d and 7b7e973 worktrees;
+#                   observer evidence uploaded, provenance echoed into the log
+#   formal          Lean 4 (pinned by formal/lean-toolchain) checks Boundary.lean;
+#                   allowed to fail so a slow toolchain download never blocks the
+#                   other two
 name: verify
-on: [push, pull_request]
+on:
+  push:
+    branches: ['hardening-*']
+  workflow_dispatch:
+
 jobs:
-  verify:
+  implementation:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tests build pristine 631196d from git archive
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json   # engines.node; there is no .nvmrc
+      - name: Node version and where it came from
+        run: |
+          echo "node $(node --version); source: package.json engines.node = $(node -p 'require("./package.json").engines.node') (no .nvmrc in repo)"
+      - run: npm ci
+      - name: npm test
+        run: |
+          npm test 2>&1 | tee /tmp/npm-test.log
+          echo "--- summary"; grep -E '^ℹ (tests|pass|fail)' /tmp/npm-test.log
+      - name: default scenario demo and replay (the pre-hardening checks, kept)
+        run: |
+          node dist/src/demo.js | tail -3
+          node dist/src/replay.js | tail -6
+      - name: hardening campaign
+        run: |
+          npm run experiment:hardening 2>&1 | tee /tmp/hardening.log
+          echo "--- summary"; tail -1 /tmp/hardening.log
+          node -e 'const r=require("./experiments/hardening/RESULTS.json"); console.log(`${r.sql.acceptedCases} SQL / ${r.sql.mismatches} mismatches; ${r.files.length} file cases; known misses: ${r.files.filter(f=>f.knownMiss).map(f=>f.name).join(",")}`)'
+          node scripts/manifest-digest.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hardening-results-${{ github.sha }}
+          path: experiments/hardening/RESULTS.json
+
+  counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # worktrees at 631196d and 7b7e973
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+      - name: Build the two frozen versions in separate worktrees
+        run: |
+          git worktree add /tmp/mab-exp/v1 631196d
+          git worktree add /tmp/mab-exp/head 7b7e973
+          (cd /tmp/mab-exp/v1 && npm ci --no-audit --no-fund && npm run build)
+          (cd /tmp/mab-exp/head && npm ci --no-audit --no-fund && npm run build)
+      - name: Run input source, both SUTs, replays and the observer as separate processes
+        run: bash experiments/independent-observer/run-all-local.sh /tmp/mab-exp 2>&1 | tee /tmp/run-all.log
+      - name: Two-row table and the raw v1 observer line
+        run: |
+          echo "--- evidence table"; cat /tmp/mab-exp/results/evidence-table.md
+          echo "--- raw observer line for v1 (from the run log)"
+          grep -F '"label":"v1-631196d"' /tmp/run-all.log | grep -F '"comparison":"DIVERGENCE"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: observer-evidence-${{ github.sha }}
+          path: |
+            /tmp/mab-exp/results/obs-*.json
+            /tmp/mab-exp/results/effect-v1/
+            /tmp/mab-exp/results/ledger-*.jsonl
+            /tmp/mab-exp/results/stimulus.json
+            /tmp/mab-exp/results/sut-*.json
+            /tmp/mab-exp/results/replay-*.txt
+            /tmp/mab-exp/results/evidence-table.*
+      - name: Provenance record
+        run: |
+          echo "runner hostname: $(hostname)"
+          echo "uname -a: $(uname -a)"
+          echo "git sha: $(git rev-parse HEAD)"
+          echo "observer sha256 (observe.mjs, from obs-v1.json): $(node -p 'require("/tmp/mab-exp/results/obs-v1.json").fileSha256')"
+          echo "effect file sha256 (sha256sum, independent of observe.mjs): $(sha256sum /tmp/mab-exp/results/effect-v1/corp/public/notes.md | cut -d' ' -f1)"
+          echo "observe.mjs sha256: $(sha256sum experiments/independent-observer/observe.mjs | cut -d' ' -f1)"
+
+  formal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true   # a slow or failed Lean install must not block the other jobs
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm ci
-      - run: npm run build
-      - run: node dist/src/demo.js
-      - run: node dist/src/replay.js
-      - run: npm run test:only
+          node-version-file: package.json
+      - name: Install elan and the pinned Lean toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat formal/lean-toolchain)"
+      - name: npm run test:formal
+        run: |
+          lean +"$(cat formal/lean-toolchain)" --version
+          npm run test:formal
