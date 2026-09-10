@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-09T17:52:57.289Z",
-  "output": "/Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-90dGzg",
+  "generatedAt": "2026-09-10T08:53:02.066Z",
+  "output": "/Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-k9IiIz",
   "node": "v26.8.1",
   "platform": "darwin",
-  "gitHead": "7b7e973523faba21f91d6f8b2e05b3e5fa107077",
+  "gitHead": "e29b6660da32dec74c82824ad5d8eb7dac76315f",
   "sourceHashes": {
     "containment/src/deployments.ts": "b5f370987cbc81f2f63d79e6ff981b54379c096c67544dc8f2f6594de30be935",
     "containment/src/fixture.ts": "b9ae9550078fd1d37d60223bdc3664142d5f14020a507c862e5d73584c7626e3",
@@ -12,22 +12,31 @@
     "containment/test/acceptance.test.ts": "9c10f63ca0e25585a07ed2f290f439aa436e8e1c704aa55408a99043363689d5",
     "containment/test/graph.test.ts": "42e40f01dc1a04141ee8ced1a679d99086b47abc4d333227a57f685ee8c3ab79",
     "containment/test/mediator.test.ts": "84c707ddab9bd58a09e4e9d3fd255971b09256c8468b9998662e72b7b3f2fe91",
+    "docs/REPAIR.md": "3d2ee02e95ad40a2208a9ff145dfc31ad959fbfd6ecfe8064edf7b1f32ce9779",
+    "docs/THREAT_MODEL.md": "da5b19ebaa90d3ba69592e0b863bd919fd4c31f6f943036730920ad762862aa4",
     "entities/entities.json": "2d559ad26c91d1bba480235348edfec02bc2beebbe91c81f9e9566634fcdeab1",
     "experiments/hardening/file-backend.mjs": "82d4f056a4b0b71b5a56e147add0a65d15957203e8eeb7d2ed8ec1cfa2c703bc",
-    "experiments/hardening/file-worker.mjs": "a5b27ac1099ce90dead62e8e294778ccf02da2500e42cf25a1cc948ed8cd9dcc",
+    "experiments/hardening/file-worker.mjs": "cc0ec92b77c8f5c79ef7005eacbbc172c1e5dfd32549429730b07964f3e4713a",
     "experiments/hardening/observer.mjs": "a2d2610eb1004e521667e53fab09c71b3eb11bd38da0da61f9dde9b29c42d2e9",
-    "experiments/hardening/run.mjs": "3ef3895399f9ae3c7b770d33983dc3fb79f725abcc5fd809bab087dd5dbfb245",
+    "experiments/hardening/run.mjs": "5cfea979224893bdca0ed70e42f4374483e5248501d0420a4d9abe36e439cf40",
     "experiments/hardening/sql-oracle.py": "f590bc860266294846b256d58b022fad13764cf9cf452797a75adaa0c6046fa3",
-    "formal/Boundary.lean": "633942985e81b48d47cc129e3636c6ca6c52f908c908c963593de93ee58bbd20",
+    "experiments/independent-observer/compare.mjs": "7e97f9946974a0b53fdeac6e96b1b433092f2ba074c6ea49a570d9ab55d27301",
+    "experiments/independent-observer/make-stimulus.mjs": "b60876f9210800d0c3f3fdc7e66c76350f6c8d5c7404a850ea08ef8e5839c1f8",
+    "experiments/independent-observer/observe.mjs": "889cf7a27b9504228c48fcf501a36b0a05bd7103c84d42dd3036cf1a5f070bd0",
+    "experiments/independent-observer/run-all-local.sh": "bc9c76e3c242274bf5978095879888ef70e2d20697e97b14c167c128898e82fe",
+    "experiments/independent-observer/run-sut.mjs": "8e3aa790d16178cb7b78b101e3566a1c5769228482284225ed958c6dedac9fb9",
+    "formal/Boundary.lean": "68258ec169ae6ea7429d0af3d008f8e6203c20e0a48599cf241ec7e82b412998",
     "formal/lean-toolchain": "3aac669c7a910ec2389f4e4f921b605adf6ebf2d1e0c9b9cd0be4d33f3f5db71",
+    "formal/vectors.json": "94373db6ed1fc42317c5121fe07c717c5b4cdba1cdd773631d2e3f80bb92e820",
     "package-lock.json": "6a706e469ae7ecddeaeba4eb71529b334c6bec11473e74dd9751933e89e30104",
-    "package.json": "87b6de303502475b510db373bd9e82235d908120a263202bfc3ad4665e5316bb",
+    "package.json": "e3229d554f0c53cee6575cb23a156bb8e55ec58f0f9cd4f1c3a5de238fd97704",
     "policies/00-least-privilege.cedar": "3b3a59c31fc84dd5138cce41a6fba82097bf8234855a03f7f7fe6faa103b9694",
     "policies/10-delegation.cedar": "28ffed69a57f9bb4a22b0914867b2b574f6e896e6ac30a5ec4a33575d78d060c",
     "policies/20-guardrails.cedar": "ccd8a9a055387ed747edde5a98c7b1b2ca8765feb52bfed8c971766676905b92",
     "policies/mcp.cedarschema": "d5f42b305962fea8ac06f0d689c2d0d5438584fee42dada452b3bc49649e3bc6",
     "policies/overlay-revocation/90-revoke-analyst.cedar": "7e492baa67f3d3b77616c4fe8e6ede7c489f8cb5b2fc3deb4812b916500bbc80",
-    "scripts/check-formal.mjs": "6d12a64783ff45d05f3d315fa1df7b44df57d7b2f6de430755bc496fff8eec4c",
+    "scripts/check-formal.mjs": "162037d4380c43a5de61f51f9e7fcfb18013c8a8c4706d013d2098b06a2733b5",
+    "scripts/manifest-digest.mjs": "b628236165475c6ee8155ffb1d402482e34c1cbf1428ee643513027733544991",
     "scripts/screenshot.mjs": "0938092fdfcc695d48f0ba97c98161f9a31c178c7d53b3d664639116355b3cad",
     "src/agent.ts": "10b6876d28f99b5a60a392d7758445c1114aa5fbdd22a8933b96189bc252fc2f",
     "src/canonical.ts": "bb732705a8bafbd1dd8099bc7d89a619ebd22c02d60bfba3e7724345ede597a1",
@@ -53,15 +62,20 @@
     "test/external-effect.test.ts": "03fbc3bfe6bb74fdcd7d56d4946a0ab8ec3f2a695c736e3d6d8245db2b929399",
     "test/failclosed.test.ts": "aa68242fcf94ff84b2a205e41ca97eddcb32121adb9c615285b19e85acc5791f",
     "test/falsification.test.ts": "f5543b067d1e5957f7bf8997dd291d4478be425c466ee947b8f88bbfad904e7d",
+    "test/filter-vs-repair.test.ts": "12911a6e683d6724f66e79dad19e97dbeb51d44a365ee9edbf05756ff8088f33",
+    "test/formal-vectors.test.ts": "ef652154b6cc88c8674915f4e505195dea576a1c567f949d9370b825daa02245",
+    "test/grant-binding.test.ts": "b4b92823a40153f864b66e0486ebfcaf27ce11c75e621051693fa71e7ca5c550",
     "test/hardening.test.ts": "5189cf1b8008e0027cde1e0a70cc6d66ef49f7367ef46540aed96998b6619776",
     "test/helper.ts": "5cfa7b4ea274a7e110cf962fb0a81496d4560c1203bdb2d6ca732a6f7f947933",
     "test/injection.test.ts": "a14094ffc40fa14f519f6e81cccfff6391ca00ed688982e417e328cdb1e56ad4",
     "test/mediation.test.ts": "ce8449ce622d8fb2e980ac55a272c5957aaa98708980fde048da85b7d8808462",
+    "test/observer-export.test.ts": "fae6556b4bcb0f11707559d18b03e7e707b773f3d1f4e5d752fe0b977cd2c1c7",
     "test/policy-update.test.ts": "1529fe0455c3f7b9c635afca0fa11208d42d37bc4c5038a10cf5e693ab725d52",
     "test/regression.test.ts": "02ba004442363eaa0a1e33e2780555e6b1a8798317c17a89aa1ff1a55c851f13",
     "test/replay.test.ts": "50d9235c0723c8c3826f8ac4fa2327e97095e741a99cb697fca9f6d0cdbfeea3",
     "test/scenarios.test.ts": "6cfeb7fbfa65f4bb22c5c49bdf4c4ea329b2f3f0272281f6b507ee8a9141ead2",
-    "test/session-establishment.test.ts": "c72da54d5e52ef755825dcb4a1dd8b22405d47007a65f5dd4c5f917633bc56ed"
+    "test/session-establishment.test.ts": "c72da54d5e52ef755825dcb4a1dd8b22405d47007a65f5dd4c5f917633bc56ed",
+    "test/v1-build.ts": "60a9cb3d3e12b4012ed6b5b42224bc6ed642857fee5f2cda79101b8505b7fbfa"
   },
   "sql": {
     "acceptedCases": 240,
@@ -202,7 +216,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-90dGzg/shadow/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-k9IiIz/shadow/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -219,7 +233,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-90dGzg/no-write/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-k9IiIz/no-write/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -247,7 +261,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-90dGzg/completion-failure/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-k9IiIz/completion-failure/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -258,6 +272,38 @@
       "outcomes": [
         {
           "error": "Error: injected prepare failure"
+        }
+      ],
+      "findings": []
+    },
+    {
+      "name": "transient-extra-write",
+      "replay": "ALL STAGES PASS",
+      "observer": "AGREE",
+      "knownMiss": "unauthorized transient file: written during the run, deleted before it ends; invisible to final-state observation",
+      "outcomes": [
+        {
+          "decision": "allow"
+        },
+        {
+          "transient": "corp/public/notes.md.shadow",
+          "presentBeforeCleanup": true
+        }
+      ],
+      "findings": []
+    },
+    {
+      "name": "transient-revert",
+      "replay": "ALL STAGES PASS",
+      "observer": "DIVERGENCE",
+      "outcomes": [
+        {
+          "decision": "allow"
+        },
+        {
+          "transient": "corp/public/notes.md",
+          "presentBeforeCleanup": true,
+          "revertedTo": 14
         }
       ],
       "findings": []
@@ -314,7 +360,7 @@
   "symlinkControl": "PASS",
   "scope": "local experiment with real files, separate observer process and controller-held pre-tamper anchor; shared host and author; no cryptographic machine independence",
   "limitations": [
-    "final-state observation misses transient/reverted effects",
+    "final-state observation misses transient effects outside the record (measured: transient-extra-write); a reverted recorded write is caught (measured: transient-revert)",
     "file adapter assumes the experiment owner controls directory topology during execution",
     "write-ahead logging records authorization; it cannot make arbitrary external effects transactional",
     "SQL oracle covers the accepted subset on this SQLite build"

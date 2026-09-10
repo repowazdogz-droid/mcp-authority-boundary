@@ -32,3 +32,30 @@ For interpreting the results, use the [experiment guide](README.md) and
 [current claim limits](../../docs/HARDENING.md). Historical Newcastle slides
 still refer to earlier frozen commits; do not substitute current outcomes into
 their old tables without relabeling the version and measurement setup.
+
+## Addendum, 2026-09-10 (branch `hardening-2026-09-10`)
+
+The modifications described above are now committed on branch `hardening-2026-09-10`
+(snapshot `d08b6be`, base `7b7e973` on `main`). Re-measured on that branch:
+
+- Full regression suite: **177 passed, 0 failed** (was 169; +8 from
+  `test/observer-export.test.ts`, `test/grant-binding.test.ts`,
+  `test/filter-vs-repair.test.ts`, `test/formal-vectors.test.ts`).
+- SQL differential: **240 accepted queries, 0 mismatches**.
+- Real-file campaign: **19 cases met their declared outcomes**, including one declared
+  known miss (`transient-extra-write`: replay ALL STAGES PASS, observer AGREE) and its
+  caught counterpart (`transient-revert`: replay ALL STAGES PASS, observer DIVERGENCE).
+- Source manifest in `RESULTS.json`: 71 files, now covering
+  `experiments/independent-observer/`, `formal/` (including `vectors.json`), the new
+  tests, `docs/REPAIR.md` and `docs/THREAT_MODEL.md`. Single digest over the sorted
+  (path, hash) pairs, from `npm run manifest:digest`:
+
+  ```text
+  e2b829ad127bc865756024f071ba45e9d990eb03e0c64f9d62f7712e85651121
+  ```
+
+- `experiments/independent-observer/run-all-local.sh`: 1.18 s wall on this host; no
+  internet socket observed by `lsof -i` polling during the run (6 polls; the same poller
+  sees a deliberately opened listening socket), and the same script completes under
+  `sandbox-exec` with `(deny network*)`, a profile under which `curl` fails.
+  Single-host run; no second-machine observation is archived here.
