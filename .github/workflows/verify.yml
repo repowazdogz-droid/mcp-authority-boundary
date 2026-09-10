@@ -95,6 +95,8 @@ jobs:
     continue-on-error: true   # a slow or failed Lean install must not block the other jobs
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # test:conformance runs the suite, which rebuilds 631196d from history
       - uses: actions/setup-node@v4
         with:
           node-version-file: package.json
@@ -109,4 +111,6 @@ jobs:
           npm run test:formal
       - run: npm ci
       - name: npm run test:conformance (trace check against Boundary.lean; not a refinement proof)
-        run: npm run test:conformance 2>&1 | tail -3
+        # No pipe: on 2026-09-10 run 34481249368 this step failed and `| tail -3`
+        # masked the exit code, so the job reported success with a failed step.
+        run: npm run test:conformance
