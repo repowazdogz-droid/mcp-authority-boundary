@@ -34,7 +34,7 @@ working an expected outcome out by hand, not by any mechanism in this repository
 
 A policy that is wrong will be enforced faithfully.
 
-## L3. The correspondence layer HAD known defects; some are closed, one remains
+## L3. Canonicalization still needs an implementation correspondence proof
 
 **Read `docs/AUDIT.md` and `docs/REPAIR.md` before relying on this section.** An adversarial
 audit of this artifact falsified its original central claim by exhibiting a working
@@ -51,16 +51,21 @@ What remains, unchanged by the repair:
 Cedar can only be as correct as the request it is handed. `resolve.ts` is the code that
 turns a tool call into that request, and it is ordinary, unverified TypeScript.
 
-The SQL resolver extracts table names with a regular expression, which is not a parser. It
-refuses anything it cannot bind to exactly one known table, so its failure mode is false
-denials rather than false allows, but a query it mis-parses into a *plausible* single table
-would be authorised against the wrong resource, and every downstream check including replay
-would agree with it. The statement class is now recorded alongside the table, which makes a
-mis-classification visible in the evidence without preventing it.
+The earlier lexical gate still accepted comma joins while binding only the first table.
+`src/sql.ts` now parses the whole supported language: a SELECT projection from one unquoted
+table, with optional schema qualification and final semicolon. The operation carries the
+parsed projection, and the fixture executes it. Writes, expressions, aliases, joins and
+comments are outside the language. This closes A6 for the advertised read-only query tool.
+The hardening campaign compares 240 accepted raw/canonical query pairs against SQLite's
+actual table-access callbacks and result rows. That is bounded differential evidence for this
+language, not a proof for every dialect or a guarantee about a production database.
 
 Path canonicalisation has the same shape and is better tested, but it is `posix.normalize`
 plus a prefix check, not a filesystem-level guarantee. It knows nothing about symlinks,
-because the documents here are an in-memory map rather than real files.
+because the default documents are an in-memory map rather than real files. The separate
+hardening campaign uses real files with symlink refusal and atomic replacement in directories
+owned by the experiment. It assumes no hostile concurrent directory replacement. It does not
+establish general POSIX confinement, mount isolation, or crash-atomic external effects.
 
 ## L4. Taint tracking is a turn-level flag, not information flow
 
@@ -80,10 +85,11 @@ a substantially harder problem and this is not an approximation of it.
 
 **Do not read claims A and B as implying C or D.** The README lists four claims deliberately
 apart: mediation, authorization binding, policy adequacy, and effect verification. This
-artifact supports A and B; it explicitly does not support C, and keeps two live
-counterexamples to C (findings A2 and A6) rather than closing them, because an artifact that
-demonstrated only successes would be less useful; and D is not established by the shipped
-evidence at all (L7).
+artifact supports A and B; it does not establish C. A2 and A6 now have regression fixes:
+both edges of depth-two delegation are checked, and the query tool accepts only its parsed
+read-only language. Closing known policy defects does not prove policy adequacy. The default
+scenario evidence still does not establish D (L7); a separate real-file campaign supplies
+scoped positive and fault-injection evidence.
 
 The property "no sequence of prompts can cause execution of a tool action that Cedar denies"
 is universally quantified over an infinite set. It is not established by running 25
@@ -99,15 +105,20 @@ What is actually supported, in decreasing order of strength:
    the metrics, and again by the independent verifier.
 3. **A scenario set.** 25 authored scenarios, all matching their declared outcomes.
 
-A machine-checked proof would need a formalisation of the enforcement point, not just of the
-policy language. That is not in scope here.
+`formal/Boundary.lean` now proves trace invariants: every reachable execution has a matching
+prepared allow on the derived request, and grant identifiers execute at most once. It includes
+a reachable positive execution and a reachable grant-reuse mutant counterexample. Run
+`npm run test:formal` with pinned Lean 4.33.1. The main proofs use standard `propext` and
+`Quot.sound`, with no `sorryAx` or custom axioms. Policy evaluation and request derivation
+remain model parameters; TypeScript refinement, hash encoding and collision resistance,
+ledger durability and external effects are not mechanized.
 
 ## L6. The ledger cannot witness itself
 
-The hash chain proves the file has not been edited or reordered since it was written. Any
-change to a past entry breaks that entry's hash and, because links are recomputed rather
-than read, every link after it. `test/replay.test.ts` demonstrates edits, deletions, and a
-re-hashed forgery.
+The hash chain checks internal consistency. Editing without recomputing hashes breaks the
+chain, but an attacker can replace an entire self-consistent chain. Authenticity requires a
+trusted reference outside the attacker's control. `test/replay.test.ts` demonstrates local
+edits and deletions; the hardening campaign also tests a rewritten seal and truncated journal.
 
 It proves nothing about whether the log reflects reality. An adversary with code execution
 inside the server process can write a perfectly consistent chain describing events that
@@ -116,10 +127,19 @@ recording.
 
 Two consequences worth stating separately:
 
-- **Truncation of the tail leaves a valid prefix.** Dropping the last N entries produces a
-  ledger that verifies cleanly. The chain gives integrity and ordering, not completeness.
-  There is a test that asserts exactly this, deliberately, so the gap is visible rather than
-  implied.
+- **An unsealed chain cannot detect tail truncation.** Dropping the last N entries produces a
+  valid prefix. The repaired experiment calls `Ledger.seal()` at the end of a run and replay
+  checks the sidecar seal (`ledger.jsonl.seal.json`). A retained seal detects truncation,
+  but a co-located editable seal cannot authenticate itself. Replay accepts `--anchor PATH`
+  for a verifier-held copy. The campaign captures that copy before tampering, then tests
+  truncation even when the attacker rewrites the local seal and intent journal.
+- **Execution has a write-ahead record.** The enforcement point fsyncs its exact authorization
+  to `ledger.jsonl.intents.jsonl` before execution. Replay reconciles every intent and completed
+  execution in both directions. A completion failure leaves an unresolved outcome, blocks
+  subsequent execution, and prevents sealing. An exclusive lock covers prepare/effect/complete;
+  a killed process can leave a stale lock requiring explicit recovery. This provides no atomic
+  transaction with arbitrary external systems. Directory fsync and power-loss recovery are
+  not established. The host process remains trusted and can bypass its own storage mechanisms.
 - **Replay shares the engine, and three of its four stages share more.** Stage 2 shares the
   Cedar build and the classifier; stage 3 shares the request-derivation function; only stage 4
   compares two things derived by different routes, and it does so **for two of the six tools,
@@ -132,7 +152,12 @@ entirely and re-derives it from the recorded request plus the policy files on di
 the verifier holds independently of the log. That is a genuine reconstruction. It is not an
 independent oracle.
 
-## L7. Effects are simulated, and for four of six tools the check is not an observation
+## L7. Default scenario effects and the separate real-file campaign
+
+The following composition describes the default 27-entry ledger. The newer
+`experiments/hardening/` campaign separately tests real file writes and deletes and reads the
+whole filesystem from another process. It supplies positive and fault controls without
+relabeling the default scenario mix. Its final-state observer cannot prove event completeness.
 
 **Released v1.0.0 overstated this claim; the correction is in the README, under the claim
 table.** `test/evidence-composition.test.ts` guards against the combination recurring.
@@ -151,7 +176,7 @@ the two sides of the comparison do not come from different places for all of the
 | Tool | What `observeEffect` reads | Independent of the operation? | Executions in the shipped ledger |
 |---|---|---|---|
 | `write_document` | re-reads the `documents` map | **Yes.** A tool that wrote elsewhere, or wrote something else, is caught | **0** (two denials). Demonstrated instead in `test/external-effect.test.ts` |
-| `delete_file` | checks absence in the `documents` map | **Yes** | **0** (two denials). Demonstrated nowhere |
+| `delete_file` | checks absence in the `documents` map | **Yes** | **0** (two denials). Real-file execution now covered by the separate hardening campaign |
 | `read_document` | tail of `readLog` | **No** | 5 |
 | `send_email` | tail of `outbox` | **No** | 1 |
 | `execute_shell` | tail of `shellLog` | **No** | 2 |
@@ -188,7 +213,7 @@ implemented for `write_document` and `delete_file` only; the ledger executes nei
 stage-4 check it contains is consistency of the record with itself. The read-back is
 demonstrated for `write_document` in `test/external-effect.test.ts`, by tampering with the
 `documents` map behind the tool's back and requiring the check to go red, and it is
-demonstrated for `delete_file` nowhere at all. The `effect-consistency` line in the replay
+demonstrated for `delete_file` in the separate real-file campaign. The `effect-consistency` line in the default replay
 output and the stage table in `EVIDENCE.md` are worded to match; this is the same distinction
 L6 draws about the ledger, arriving one layer down.
 

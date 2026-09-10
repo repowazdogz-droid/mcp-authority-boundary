@@ -79,7 +79,10 @@ exhaustive sweep found the gap.
 
 Absence and wrong-type are now distinguished explicitly (`'body' in clean ? … : ''`).
 
-## Findings deliberately NOT fixed
+## Findings left open in the original repair (historical)
+
+The later hardening pass closes A2 and A6. The text below records the scope of the
+original binding repair; see [HARDENING.md](HARDENING.md) for the current status.
 
 Left open, with scope stated, because closing them would change the policy set or the
 threat model rather than the binding this repair is about:

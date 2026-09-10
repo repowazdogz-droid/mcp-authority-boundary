@@ -1,9 +1,10 @@
 import { writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import type * as cedar from '@cedar-policy/cedar-wasm/nodejs';
-import { readLedger, verifyChain } from './ledger.js';
+import { readLedger, verifyChain, verifySeal, verifyIntents } from './ledger.js';
 import { loadEntities, loadPolicy } from './policy.js';
 import { Pdp } from './pdp.js';
-import { cedarRequestFromOperation } from './resolve.js';
+import { cedarRequestFromOperation, resolveCall } from './resolve.js';
 import { expectedEffectOf, effectsMatch } from './tools.js';
 import { sha256Canonical } from './canonical.js';
 import type { CedarContext, LedgerEntry } from './types.js';
@@ -86,16 +87,9 @@ function overlaysOf(entry: LedgerEntry): string[] {
   ];
 }
 
-function main(): void {
-  const path = process.argv[2] ?? 'evidence/ledger.jsonl';
+export function replay(path: string, anchorPath?: string) {
   const entries = readLedger(path);
   const findings: Finding[] = [];
-
-  if (entries.length === 0) {
-    console.error(`no ledger at ${path} - run \`npm run demo\` first`);
-    process.exitCode = 1;
-    return;
-  }
 
   const counts: Record<StageName, { checked: number; na: number; fail: number }> = {
     'chain-integrity': { checked: 0, na: 0, fail: 0 },
@@ -112,6 +106,9 @@ function main(): void {
   const chain = verifyChain(entries);
   counts['chain-integrity'].checked = entries.length;
   for (const f of chain.failures) fail(f.seq, 'chain-integrity', f.problem);
+  const seal = verifySeal(path, entries, anchorPath);
+  if (!seal.ok) fail(-1, 'chain-integrity', seal.problem!);
+  for (const problem of verifyIntents(path, entries)) fail(-1, 'chain-integrity', problem);
 
   const pdps = new Map<string, { pdp: Pdp; sha: string }>();
   const seenRequestIds = new Set<string>();
@@ -166,7 +163,13 @@ function main(): void {
       }
       const derived = cedarRequestFromOperation(e.operation);
       const ctx = e.cedarRequest.context as CedarContext;
-      if (derived.action.id !== e.cedarRequest.action.id) {
+      const reconstructed = resolveCall({ tool: e.operation.tool, args: { ...e.operation } }, {
+        requestId: e.requestId, now: ctx.now, sourceTrust: ctx.sourceTrust, entities,
+      });
+      if (!reconstructed.ok || sha256Canonical(reconstructed.call.operation) !== digest) {
+        fail(e.seq, 'auth-exec-binding', 'recorded operation is not a canonical valid operation');
+      }
+      if (derived.action.id !== e.cedarRequest.action.id || derived.action.type !== e.cedarRequest.action.type) {
         fail(e.seq, 'auth-exec-binding', `action ${e.cedarRequest.action.id} is not what the operation derives (${derived.action.id})`);
       }
       if (derived.resource.id !== e.cedarRequest.resource.id || derived.resource.type !== e.cedarRequest.resource.type) {
@@ -177,6 +180,17 @@ function main(): void {
       }
       if (derived.recipientDomain !== ctx.recipientDomain) {
         fail(e.seq, 'auth-exec-binding', `context recipientDomain "${ctx.recipientDomain}" is not what the operation derives ("${derived.recipientDomain}")`);
+      }
+      if (ctx.requestId !== e.requestId || ctx.now !== e.logicalTime || e.decision.requestId !== e.requestId) {
+        fail(e.seq, 'auth-exec-binding', 'request identity or logical clock disagrees across record');
+      }
+      if (!e.mediation || e.mediation.hash !== sha256Canonical({
+        operationSha256: digest, verdict: e.mediation.verdict, reason: e.mediation.reason,
+      })) {
+        fail(e.seq, 'auth-exec-binding', 'mediation content does not match its operation-bound hash');
+      }
+      if (e.toolResult !== null && e.mediation?.verdict !== 'allow') {
+        fail(e.seq, 'auth-exec-binding', 'execution lacks an allowing mediation record');
       }
       // execution requires an allow
       if (e.toolResult !== null && e.decision.decision !== 'allow') {
@@ -207,7 +221,13 @@ function main(): void {
     }
 
     // ---- stage 2: policy replay -------------------------------------------
-    if (e.decision.denialKind === 'unresolvable-resource') {
+    if (e.decision.denialKind === 'unresolvable-resource' || e.decision.denialKind === 'mediation-denied') {
+      if (e.decision.decision !== 'deny' || e.toolResult !== null) {
+        fail(e.seq, 'policy-replay', 'pre-Cedar refusal claims an allow or execution');
+      }
+      if (e.decision.denialKind === 'mediation-denied' && e.mediation?.verdict !== 'deny') {
+        fail(e.seq, 'auth-exec-binding', 'mediation denial lacks a denying mediation record');
+      }
       // refused by the host before Cedar saw it; there is nothing to re-decide
       counts['policy-replay'].na += 1;
       continue;
@@ -236,7 +256,7 @@ function main(): void {
   }
 
   const ESTABLISHES: Record<StageName, string> = {
-    'chain-integrity': 'the file has not been edited or reordered since it was written',
+    'chain-integrity': 'hash-chain consistency, agreement with the supplied end seal, and reconciliation of write-ahead intents. An untrusted co-located seal cannot authenticate history',
     'policy-replay':
       'the recorded decision is reproducible from the recorded request (shares the Cedar build and classifier with the producer)',
     'auth-exec-binding':
@@ -252,7 +272,7 @@ function main(): void {
       checked: c.checked,
       notApplicable: c.na,
       failures: c.fail,
-      verdict: c.checked === 0 ? 'NOT CHECKED' : c.fail === 0 ? 'PASS' : 'FAIL',
+      verdict: c.fail > 0 ? 'FAIL' : c.checked === 0 ? 'NOT CHECKED' : 'PASS',
       establishes: ESTABLISHES[stage],
     };
   });
@@ -271,12 +291,14 @@ function main(): void {
   const allPass = stages.every((s) => s.verdict === 'PASS');
   const anyUnchecked = stages.some((s) => s.verdict === 'NOT CHECKED');
 
-  const result = {
+  return {
     ledger: path,
     entries: entries.length,
     stages,
     findings,
     verdict: allPass ? 'ALL STAGES PASS' : anyUnchecked && findings.length === 0 ? 'INCOMPLETE' : 'FAILED',
+    anchor: anchorPath ?? `${path}.seal.json`,
+    anchorTrust: anchorPath ? 'caller-supplied anchor; trust depends on custody' : 'co-located, unauthenticated seal',
     scope:
       'Stages 1-3 compare records to other records or re-derive them with code shared with the producer; ' +
       'they establish integrity and reproducibility, not correctness. Stage 4 is the only stage whose two ' +
@@ -284,10 +306,25 @@ function main(): void {
       'derivation rather than re-observing the world, which is impossible after the fact.',
   };
 
-  writeFileSync('evidence/replay-report.json', JSON.stringify(result, null, 2));
+}
+
+function main(): void {
+  const path = process.argv[2] ?? 'evidence/ledger.jsonl';
+  const option = (name: string) => {
+    const at = process.argv.indexOf(name);
+    if (at < 0) return undefined;
+    const value = process.argv[at + 1];
+    if (!value || value.startsWith('--')) throw new Error(`missing value for ${name}`);
+    return value;
+  };
+  const result = replay(path, option('--anchor'));
+  // Ad-hoc replays no longer overwrite the shipped experiment report.
+  const output = option('--report') ?? (path === 'evidence/ledger.jsonl' ? 'evidence/replay-report.json' : undefined);
+  if (output) writeFileSync(output, JSON.stringify(result, null, 2));
+  const { stages, findings } = result;
 
   console.log(`replay ${path}`);
-  console.log(`  entries ${entries.length}`);
+  console.log(`  entries ${result.entries}`);
   for (const s of stages) {
     const pad = s.stage.padEnd(20);
     console.log(
@@ -304,4 +341,7 @@ function main(): void {
   }
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try { main(); }
+  catch (error) { console.error(`replay FAILED: ${String(error)}`); process.exitCode = 1; }
+}

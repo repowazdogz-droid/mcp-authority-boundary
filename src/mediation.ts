@@ -107,6 +107,8 @@ export class ExecutionGrant {
     this.mediationSha256 = mediationSha256;
     this.resource = resource;
     this.policyVersionSha = policyVersionSha;
+    Object.freeze(this.resource);
+    Object.freeze(this);
   }
 }
 
@@ -191,6 +193,14 @@ export function consumeGrant(
       `refusing to execute: grant is bound to mediation ${grant.mediationSha256.slice(0, 12)}, ` +
         `but the record presented digests to ${mediation.hash.slice(0, 12)}`,
     );
+  }
+
+  if (mediation.hash !== sha256Canonical({
+    operationSha256: mediation.operationSha256,
+    verdict: mediation.verdict,
+    reason: mediation.reason,
+  })) {
+    throw new Error('refusing to execute: mediation content does not match its hash');
   }
 
   const digest = sha256Canonical(operation);

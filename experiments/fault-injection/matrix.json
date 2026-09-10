@@ -1,0 +1,85 @@
+{
+  "producedBy": "tabulate.mjs over /tmp/mab-mut/results artifacts (suites, probes, replays, observations)",
+  "rows": [
+    {
+      "defect": "D1 executor uses raw input",
+      "tests": "PASS 155/0",
+      "cedar": "unexpected-type input refused / plain input allowed (masked upstream)",
+      "replay": "ALL STAGES PASS",
+      "binding": "PASS",
+      "observer": "AGREE"
+    },
+    {
+      "defect": "D2 grant-digest check removed",
+      "tests": "PASS 155/0",
+      "cedar": "allow (for input A; grant presented with input B)",
+      "replay": "n/a (no ledger on this probe path)",
+      "binding": "n/a",
+      "observer": "no write (grant presented with input B is stopped at the linkage check)"
+    },
+    {
+      "defect": "D3 resource altered post-auth",
+      "tests": "FAIL 135 pass / 20 fail (e.g. T1b the amplification is real: B ends up holding finance content it cannot read; T4b the repair re-routes the function rather than deleting it; A1c the ledger now records the canonical operation and both effect fingerprints)",
+      "cedar": "allow, then fail-loud THROW",
+      "replay": "n/a (no ledger on this probe path)",
+      "binding": "n/a",
+      "observer": "EFFECT_WITHOUT_RECORD (stray .shadow file, empty ledger)"
+    },
+    {
+      "defect": "D4 coercion reintroduced",
+      "tests": "FAIL 152 pass / 3 fail (e.g. A1 [WAS EXPLOITABLE, NOW BLOCKED] a non-string payload is refused before Cedar; A8 the A1 divergence can no longer be recorded, so there is no such ledger to replay; F1 every string field of every tool rejects every non-string, fail-closed)",
+      "cedar": "ALLOW byteLen=0",
+      "replay": "ALL STAGES PASS",
+      "binding": "PASS",
+      "observer": "AGREE (0 vs 0)"
+    },
+    {
+      "defect": "D5 grant reuse allowed",
+      "tests": "PASS 155/0",
+      "cedar": "allow",
+      "replay": "n/a (no ledger on this probe path)",
+      "binding": "n/a",
+      "observer": "EFFECT_WITHOUT_RECORD (11B written, zero ledger lines)"
+    },
+    {
+      "defect": "D6 effect omitted",
+      "tests": "FAIL 135 pass / 20 fail (e.g. T1b the amplification is real: B ends up holding finance content it cannot read; T4b the repair re-routes the function rather than deleting it; A1c the ledger now records the canonical operation and both effect fingerprints)",
+      "cedar": "allow, then fail-loud THROW",
+      "replay": "n/a (no ledger on this probe path)",
+      "binding": "n/a",
+      "observer": "NO_EXECUTION_NO_WRITE"
+    },
+    {
+      "defect": "D9 combined variant (D1+D4)",
+      "tests": "FAIL 152 pass / 3 fail (e.g. A1 [WAS EXPLOITABLE, NOW BLOCKED] a non-string payload is refused before Cedar; A8 the A1 divergence can no longer be recorded, so there is no such ledger to replay; F1 every string field of every tool rejects every non-string, fail-closed)",
+      "cedar": "allow at resolution, then THROW at linkage",
+      "replay": "n/a (no ledger on this probe path)",
+      "binding": "n/a",
+      "observer": "NO_EXECUTION_NO_WRITE"
+    },
+    {
+      "defect": "D7a mediation record edited",
+      "tests": "n/a (post-hoc ledger edit)",
+      "cedar": "n/a",
+      "replay": "FAIL (2 findings)",
+      "binding": "PASS",
+      "observer": "AGREE (effect matches; the edit is in mediation metadata)"
+    },
+    {
+      "defect": "D7b mediation edited + chain re-hashed",
+      "tests": "n/a (post-hoc ledger edit)",
+      "cedar": "n/a",
+      "replay": "ALL STAGES PASS",
+      "binding": "PASS",
+      "observer": "AGREE (fully invisible)"
+    },
+    {
+      "defect": "D8 ledger truncated",
+      "tests": "n/a (post-hoc ledger edit)",
+      "cedar": "n/a",
+      "replay": "ALL STAGES PASS",
+      "binding": "PASS",
+      "observer": "EFFECT_WITHOUT_RECORD (truncated target) / AGREE (retained control)"
+    }
+  ]
+}

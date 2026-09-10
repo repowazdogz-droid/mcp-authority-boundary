@@ -1,7 +1,7 @@
 import { permitAllMediator } from '../src/mediation.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type * as cedar from '@cedar-policy/cedar-wasm/nodejs';
@@ -169,7 +169,7 @@ const B_LAUNDERED = session('sess-B-laundered', {
 
 function pepWith(extra: cedar.EntityJson[], sessionId: string, clock: number) {
   const policy = loadPolicy('v1');
-  const path = join(tmpdir(), `mab-adv-${sessionId}-${clock}.jsonl`);
+  const path = join(mkdtempSync(join(tmpdir(), 'mab-adv-')), `${sessionId}-${clock}.jsonl`);
   try {
     unlinkSync(path);
   } catch {
@@ -193,19 +193,17 @@ test('A2 the direct widener IS caught - the backstop works one level up', () => 
   assert.deepEqual(entry.decision.determiningPolicies, ['forbid-widening-delegation']);
 });
 
-test('DEFECT A2: a faithful child of a widened parent launders the widening', () => {
-  // B is attenuated correctly with respect to A, and forbid-widening-delegation
-  // only ever compares a session to its IMMEDIATE parent. So B inherits an
-  // expiry that its grandparent never had.
+test('A2 repaired: a faithful child cannot launder a widened parent', () => {
+  // Historical witness: B fits A, but A exceeds the root. The repaired rule
+  // checks both edges of the admitted depth-two chain.
   const pep = pepWith([A_WIDENED, B_LAUNDERED], 'sess-B-laundered', 2000);
   const { entry } = pep.handle({ tool: 'read_document', args: { path: 'corp/public/roadmap.md' } });
-  assert.equal(entry.decision.decision, 'allow', 'B acts despite descending from a blocked grant');
-  assert.deepEqual(entry.decision.determiningPolicies, ['permit-read-tier']);
+  assert.equal(entry.decision.decision, 'deny');
+  assert.deepEqual(entry.decision.determiningPolicies, ['forbid-widening-delegation']);
 });
 
-test('DEFECT A2b: the laundered session outlives the root grant it descends from', () => {
-  // t = 9500. The root session expired at 9000 and is denied. B, two hops below
-  // it, is still allowed - derived authority strictly exceeds root authority.
+test('A2b repaired: a laundered session cannot outlive the root grant', () => {
+  // At t = 9500 the root has expired. The widened descendant must also fail.
   const root = pepWith([], 'sess-alice-root', 9500);
   const rootCall = root.handle({ tool: 'read_document', args: { path: 'corp/public/roadmap.md' } });
   assert.equal(rootCall.entry.decision.decision, 'deny');
@@ -213,7 +211,25 @@ test('DEFECT A2b: the laundered session outlives the root grant it descends from
 
   const b = pepWith([A_WIDENED, B_LAUNDERED], 'sess-B-laundered', 9500);
   const bCall = b.handle({ tool: 'read_document', args: { path: 'corp/public/roadmap.md' } });
-  assert.equal(bCall.entry.decision.decision, 'allow', 'the descendant outlives the ancestor');
+  assert.equal(bCall.entry.decision.decision, 'deny');
+  assert.deepEqual(bCall.entry.decision.determiningPolicies, ['forbid-widening-delegation']);
+});
+
+test('A2 controls: valid two-hop delegation works; grandparent revocation and hidden widening fail', () => {
+  const common = { permission: perm('read'), scope: scope('corp/public'), notBefore: 1000,
+    expiresAt: 8000, maxWriteBytes: 1024 };
+  const root = session('chain-root', { ...common, depth: 0 });
+  const parent = session('chain-parent', { ...common, depth: 1, delegatedFrom: sess('chain-root') });
+  const leaf = session('chain-leaf', { ...common, depth: 2, delegatedFrom: sess('chain-parent') });
+  const call = { tool: 'read_document', args: { path: 'corp/public/roadmap.md' } };
+  assert.equal(pepWith([root, parent, leaf], 'chain-leaf', 2000).handle(call).entry.decision.decision, 'allow');
+  for (const [label, changedRoot, changedParent] of [
+    ['revoked grandparent', session('chain-root', { ...common, depth: 0, revoked: true }), parent],
+    ['earlier parent start', root, session('chain-parent', { ...common, notBefore: 0, depth: 1, delegatedFrom: sess('chain-root') })],
+    ['forged parent depth', root, session('chain-parent', { ...common, depth: 0, delegatedFrom: sess('chain-root') })],
+  ] as const) {
+    assert.equal(pepWith([changedRoot, changedParent, leaf], 'chain-leaf', 2000).handle(call).entry.decision.decision, 'deny', label);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -320,33 +336,29 @@ test('A5 [CLOSED BY THE NEW BINDING] a grant is bound to the operation digest', 
 // A6. Action classification versus what the tool actually accepts
 // ---------------------------------------------------------------------------
 
-test('DEFECT A6: a destructive SQL statement is authorized as a read-only action', () => {
+test('A6 repaired: destructive SQL is refused before a read-only authorization', () => {
   const { pep, restore } = harness({ session: 'sess-alice-root', clock: 2000 });
   try {
     const { entry } = pep.handle({
       tool: 'query_database',
       args: { sql: 'DELETE FROM analytics.metrics WHERE 1=1' },
     });
-    assert.equal(entry.cedarRequest.action.id, 'queryDatabase');
-    assert.equal(entry.decision.decision, 'allow');
-    // queryDatabase is declared in readOnlyGroup, so this DELETE was authorized
-    // by permit-read-tier. The tool simulates, so nothing is destroyed here.
-    assert.deepEqual(entry.decision.determiningPolicies, ['permit-read-tier']);
+    assert.equal(entry.decision.decision, 'deny');
+    assert.equal(entry.decision.denialKind, 'unresolvable-resource');
+    assert.equal(entry.toolResult, null);
   } finally {
     restore();
   }
 });
 
-test('DEFECT A6b: the tool ignores the SQL entirely, so the resolver is never tested against real behaviour', () => {
+test('A6b repaired: the fixture executes the parsed projection', () => {
   const { pep, restore } = harness({ session: 'sess-alice-root', clock: 2000 });
   try {
     const { result } = pep.handle({
       tool: 'query_database',
-      args: { sql: 'SELECT * FROM analytics.metrics' },
+      args: { sql: 'SELECT visits FROM analytics.metrics' },
     });
-    // rows are chosen by resource id, not by executing the query, so a resolver
-    // that bound the wrong table would still return "correct-looking" data
-    assert.match(result!.content, /day,visits/);
+    assert.equal(result!.content, 'visits\n42\n');
   } finally {
     restore();
   }

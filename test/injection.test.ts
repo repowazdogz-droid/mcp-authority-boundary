@@ -91,7 +91,7 @@ test('write size is measured from the payload, not declared by the model', () =>
 
 test('the SQL resolver refuses ambiguity instead of guessing a resource', () => {
   assert.equal(resolveTable('SELECT * FROM crm.customers'), 'crm.customers');
-  assert.equal(resolveTable('select email from crm.customers where id > 1'), 'crm.customers');
+  assert.equal(resolveTable('select email from crm.customers where id > 1'), null, 'WHERE is outside the supported language');
   assert.equal(resolveTable('SELECT * FROM a JOIN b'), null);
   assert.equal(resolveTable('SELECT 1'), null);
   assert.equal(resolveTable(undefined), null);

@@ -329,11 +329,13 @@ export class Mediator implements EffectMediator {
     now: number,
   ): EffectMediation {
     const record = this.mediate(principal.id, operation, operationSha256, now);
-    return {
+    const binding = {
       operationSha256,
       verdict: record.verdict,
       reason: record.reason,
-      hash: record.hash,
     };
+    // The full containment record has its own chain hash. The execution grant
+    // binds the smaller EffectMediation interface, whose content is replayable.
+    return { ...binding, hash: sha256(canonicalJson(binding)) };
   }
 }

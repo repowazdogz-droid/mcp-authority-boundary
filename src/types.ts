@@ -63,6 +63,8 @@ export type ResolvedOperation =
       readonly tool: 'query_database';
       readonly table: string;
       readonly statementClass: StatementClass;
+      /** Parsed projection, '*' or comma-separated identifiers; never raw SQL. */
+      readonly columns: string;
       readonly sql: string;
     };
 

@@ -1,6 +1,8 @@
 import * as cedar from '@cedar-policy/cedar-wasm/nodejs';
 import type { LoadedPolicy, EntityStore } from './policy.js';
 import { claimMinter, type EffectMediation, type ExecutionGrant } from './mediation.js';
+import { resolveCall } from './resolve.js';
+import { canonicalJson, sha256Canonical } from './canonical.js';
 
 /** The PDP claims the sole minting capability at module load. See mediation.ts. */
 const mintGrant = claimMinter();
@@ -112,6 +114,20 @@ export class Pdp {
 
   /** Decide, and on allow mint the single-use grant the tool layer demands. */
   authorize(input: AuthorizeInput): AuthorizeResult {
+    // Re-establish the binding at the minting boundary. A caller of this API
+    // cannot supply an allowed request alongside a different operation/digest.
+    const resolved = resolveCall({ tool: input.operation.tool, args: { ...input.operation } }, {
+      requestId: input.requestId, now: input.context.now,
+      sourceTrust: input.context.sourceTrust, entities: input.entities,
+    });
+    if (!resolved.ok || sha256Canonical(input.operation) !== input.operationSha256 ||
+        canonicalJson(resolved.call.operation) !== canonicalJson(input.operation) ||
+        canonicalJson(resolved.call.action) !== canonicalJson(input.action) ||
+        canonicalJson(resolved.call.resource) !== canonicalJson(input.resource) ||
+        canonicalJson(resolved.call.context) !== canonicalJson(input.context)) {
+      return { decision: this.deny(input, 'request-validation-failure', [],
+        ['authorization request does not match the canonical operation']), grant: null };
+    }
     const decision = this.decide(input);
     if (decision.decision === 'deny') {
       return { decision: decision as Decision & { decision: 'deny' }, grant: null };

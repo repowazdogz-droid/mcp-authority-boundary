@@ -1,14 +1,19 @@
 # Evidence
 
-Everything in this document is produced by `npm run verify` and lands in `evidence/`.
-The numbers come first, then the frame that says what they mean. The frame is the more
-important half.
+This document preserves the pre-hardening measurement frame and historical audit details.
+`npm run verify` regenerates the current default scenario artifacts in `evidence/`.
+The newer proof, parser, write-ahead ledger and independent real-file experiment are documented
+in [HARDENING.md](HARDENING.md), with current outcomes and source hashes in
+[RESULTS.json](../experiments/hardening/RESULTS.json). Historical defects described below
+must not be read as claims that those defects remain live.
 
 ## Artifacts produced
 
 | File | Contents |
 |---|---|
-| `evidence/ledger.jsonl` | Every authorization decision, hash-chained |
+| `evidence/ledger.jsonl` | Every completed authorization decision, hash-chained |
+| `evidence/ledger.jsonl.intents.jsonl` | Write-ahead authorization records, fsynced before tool execution |
+| `evidence/ledger.jsonl.seal.json` | Retained expected ledger end; authenticity depends on custody |
 | `evidence/replay-report.json` | The verifier's findings and verdict |
 | `evidence/metrics.json` | The counts below, machine-readable |
 | `evidence/baseline.json` | What the same calls do with authorization removed |
@@ -73,8 +78,8 @@ these are four checks and not one check reported four times:
 | flip one `observedEffect.byteLen` | FAIL | PASS | PASS | **FAIL** |
 | flip one recorded `operation.byteLen` | FAIL | PASS | **FAIL** | PASS |
 
-The ledger is byte-identical across runs. Both the logical clock and the wall clock are
-pinned, so the hash chain reproduces exactly:
+The pre-hardening ledger had the following hash. It is retained for provenance,
+not as the hash of the regenerated current ledger:
 
 ```
 sha256(evidence/ledger.jsonl) = 7f2ee4f6894b9b92e8b155f9a88b3fdfa4f3f33ab5c6dc3eea9dd70500b17446
@@ -121,7 +126,8 @@ different standing:
 whose arguments the host cannot bind to a known resource also produces an entry, classified
 `unresolvable-resource`, rather than being dropped.
 
-One class of request produces no entry at all. It is recorded here rather than left for a
+**Historical defect, now fixed with own-property lookup and regression tests:**
+One class of request produced no entry at all. It is recorded here rather than left for a
 reader to discover, because a measurement section that claimed complete coverage of attempts
 would be the exact failure this artifact is about. `isToolName` tests `name in TOOL_ACTION`,
 and JavaScript's `in` operator walks the prototype chain, so a tool name that is an inherited
@@ -129,7 +135,7 @@ and JavaScript's `in` operator walks the prototype chain, so a tool name that is
 `isPrototypeOf`, `__proto__`) passes that guard. No `switch` branch then matches, the canonical
 operation is never built, and the resolver throws.
 
-Observed behaviour on the current build, over the MCP transport: the caller receives JSON-RPC
+Observed behaviour on the pre-hardening build, over the MCP transport: the caller received JSON-RPC
 error `-32603`, no grant is minted, no tool runs, the fixture world is unchanged, the server
 continues serving subsequent calls, and no ledger entry is written for the attempt. A sequence
 of four calls in which one used such a name produced three entries. A genuinely unknown tool

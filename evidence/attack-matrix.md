@@ -27,7 +27,7 @@ no permit matched, which is a denial by absence of authority rather than by an e
 | S20 | The same command on a non-production host is permitted | guardrail | - | ALLOW | permit-admin-tier |
 | S21 | Data-plane revocation | revocation | - | DENY | forbid-revoked-session |
 | S22 | Revocation reaches sessions delegated from a revoked grant | revocation | - | DENY | forbid-revoked-ancestor |
-| S23 | Bounded delegation depth | delegation | - | DENY | forbid-excessive-delegation-depth |
+| S23 | Bounded delegation depth | delegation | - | DENY | forbid-excessive-delegation-depth, forbid-widening-delegation |
 | S18 | NEGATIVE CONTROL: permitted, and still harmful | limitation | - | ALLOW then ALLOW | permit-read-tier, permit-write-tier |
 | S24 | NEGATIVE CONTROL: authorized shell, consequence outside the request | limitation | - | ALLOW | permit-admin-tier |
 

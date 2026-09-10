@@ -76,9 +76,10 @@ resource, the decision is a correct answer to the wrong question, and every down
 including replay will agree with it.
 
 Where resolution is uncertain the code refuses rather than guesses, which converts a class
-of correspondence errors into false denials. The SQL path is the clearest case: a regex is
-not a parser, so any query the resolver cannot bind to exactly one known table is refused.
-The consequence is denied legitimate queries, not permitted illegitimate ones. See
+of correspondence errors into false denials. SQL now has an explicit, fully consumed
+SELECT/projection/FROM grammar in `src/sql.ts`. Anything outside it is refused. A separate
+SQLite authorizer experiment checks the resource binding of accepted queries. This remains
+bounded testing, not a proof about all SQL dialects. Unsupported legitimate queries are denied. See
 [LIMITATIONS.md](LIMITATIONS.md), L3.
 
 ## A8. Tool effects are simulated
@@ -100,6 +101,8 @@ quoted out of context.
 
 ## A10. A ledger records what happened
 
-The chain proves the file has not been edited since it was written. It does not prove the
-file describes reality. Nothing in the artifact witnesses the recording step itself. See
+The chain establishes internal consistency, not authenticity. Replay now reconciles
+write-ahead authorizations and completions, and can check a separately retained end seal.
+The real-file campaign adds a separate observer process. Neither can establish reality
+against an adversary controlling the host and the verifier's reference artifacts. See
 [LIMITATIONS.md](LIMITATIONS.md), L6.

@@ -48,6 +48,21 @@ export interface Effect {
 }
 const effects: Effect[] = [];
 
+export interface DocumentBackend {
+  get(path: string): string | undefined;
+  set(path: string, content: string): unknown;
+  delete(path: string): boolean;
+  has(path: string): boolean;
+}
+let documentBackend: DocumentBackend = documents;
+
+/** Host-only experiment configuration. Never exposed through MCP arguments. */
+export function useDocumentBackend(backend: DocumentBackend): () => void {
+  const previous = documentBackend;
+  documentBackend = backend;
+  return () => { documentBackend = previous; };
+}
+
 export function effectLog(): readonly Effect[] {
   return effects;
 }
@@ -121,7 +136,7 @@ export function executeTool(
 
   switch (op.tool) {
     case 'read_document': {
-      const content = documents.get(op.path) ?? '';
+      const content = documentBackend.get(op.path) ?? '';
       readLog.push({ path: op.path, bytes: Buffer.byteLength(content, 'utf8'), sha: sha256(content) });
       effects.push({ tool: op.tool, target: op.path, detail: `read ${content.length} bytes` });
       return {
@@ -132,7 +147,7 @@ export function executeTool(
       };
     }
     case 'write_document': {
-      documents.set(op.path, op.content);
+      documentBackend.set(op.path, op.content);
       effects.push({ tool: op.tool, target: op.path, detail: `wrote ${op.byteLen} bytes` });
       return {
         ok: true,
@@ -142,7 +157,7 @@ export function executeTool(
       };
     }
     case 'delete_file': {
-      const existed = documents.delete(op.path);
+      const existed = documentBackend.delete(op.path);
       effects.push({ tool: op.tool, target: op.path, detail: existed ? 'deleted' : 'absent' });
       return { ok: true, summary: `deleted ${op.path}`, content: '', carriesResourceContent: false };
     }
@@ -172,8 +187,11 @@ export function executeTool(
     }
     case 'query_database': {
       dbLog.push({ table: op.table, sql: op.sql });
-      const rows =
-        op.table === 'crm.customers' ? 'id,email\n1,alice@example.com\n' : 'day,visits\n1,42\n';
+      const row: Record<string, string> = op.table === 'crm.customers'
+        ? { id: '1', email: 'alice@example.com' } : { day: '1', visits: '42' };
+      const columns = op.columns === '*' ? Object.keys(row) : op.columns.split(',');
+      if (columns.some(c => !Object.hasOwn(row, c))) throw new Error('unknown fixture query column');
+      const rows = columns.join(',') + '\n' + columns.map(c => row[c]).join(',') + '\n';
       effects.push({ tool: op.tool, target: op.table, detail: `query: ${op.sql.slice(0, 60)}` });
       return {
         ok: true,
@@ -254,7 +272,7 @@ export function observeEffect(op: ResolvedOperation): EffectFingerprint {
       };
     }
     case 'write_document': {
-      const stored = documents.get(op.path);
+      const stored = documentBackend.get(op.path);
       if (stored === undefined) {
         return { kind: 'write', target: op.path, byteLen: null, sha256: null, detail: 'ABSENT after write' };
       }
@@ -272,7 +290,7 @@ export function observeEffect(op: ResolvedOperation): EffectFingerprint {
         target: op.path,
         byteLen: null,
         sha256: null,
-        detail: documents.has(op.path) ? 'STILL PRESENT after delete' : 'document absent',
+        detail: documentBackend.has(op.path) ? 'STILL PRESENT after delete' : 'document absent',
       };
     case 'send_email': {
       const last = outbox.at(-1);

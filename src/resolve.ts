@@ -1,4 +1,5 @@
 import { posix } from 'node:path';
+import { parseSelect, TABLE_COLUMNS } from './sql.js';
 import type { EntityStore } from './policy.js';
 import { uidKey } from './policy.js';
 import { sha256, sha256Canonical } from './canonical.js';
@@ -84,19 +85,18 @@ export function canonicalisePath(raw: unknown): string | null {
   const s = asString(raw);
   if (s === null || s.length === 0) return null;
   if (hasControlChars(s)) return null;
-  const nfc = s.normalize('NFC');
-  if (nfc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(nfc)) return null;
-  const normalised = posix.normalize(nfc.replace(/\\/g, '/'));
-  if (normalised.startsWith('..') || normalised === '.') return null;
+  const nfc = s.normalize('NFC').replace(/\\/g, '/');
+  if (nfc.startsWith('/') || /^[a-zA-Z]:/.test(nfc)) return null;
+  const normalised = posix.normalize(nfc);
+  if (normalised === '..' || normalised.startsWith('../') || normalised === '.') return null;
   return normalised.replace(/^\.\//, '');
 }
 
 /**
  * Classify a SQL statement by its leading keyword.
  *
- * Recorded on the operation so the record shows what class of statement was
- * authorized. NOTE: the policy set does not currently gate on this - see audit
- * finding A6, which this change makes visible but does not close.
+ * Legacy diagnostic helper retained for the historical audit. Authorization
+ * uses parseSelect's complete grammar; this heuristic cannot grant access.
  */
 export function classifyStatement(sql: string): StatementClass {
   const head = sql.replace(/^[\s(]*(?:\/\*[\s\S]*?\*\/|--[^\n]*\n)*[\s(]*/, '').trimStart();
@@ -108,19 +108,11 @@ export function classifyStatement(sql: string): StatementClass {
 }
 
 /**
- * Extract the single table a query touches. Deliberately strict: anything this
- * cannot resolve to exactly one known table is refused rather than allowed
- * through on a partial match. See docs/LIMITATIONS.md, L3 - a regex is not a SQL
- * parser, and the honest consequence is false denials, not false allows.
+ * Extract the table only after the complete supported SELECT grammar parses.
+ * Unsupported SQL is refused, including benign general-SQL extensions.
  */
 export function resolveTable(sql: unknown): string | null {
-  const s = asString(sql);
-  if (s === null) return null;
-  const froms = [...s.matchAll(/\bfrom\s+([a-zA-Z_][\w.]*)/gi)].map((m) => m[1]!);
-  const joins = [...s.matchAll(/\bjoin\s+([a-zA-Z_][\w.]*)/gi)].map((m) => m[1]!);
-  const into = [...s.matchAll(/\b(?:into|update)\s+([a-zA-Z_][\w.]*)/gi)].map((m) => m[1]!);
-  const all = [...new Set([...froms, ...joins, ...into])];
-  return all.length === 1 ? all[0]! : null;
+  return parseSelect(sql)?.table ?? null;
 }
 
 const TOOL_ACTION: Record<ToolName, string> = {
@@ -135,10 +127,10 @@ const TOOL_ACTION: Record<ToolName, string> = {
 export const TOOL_NAMES = Object.keys(TOOL_ACTION) as ToolName[];
 
 export function isToolName(x: string): x is ToolName {
-  return x in TOOL_ACTION;
+  return Object.hasOwn(TOOL_ACTION, x);
 }
 
-/** Deep-freeze so a resolved operation cannot be edited after authorization. */
+/** Operations contain only primitives, so a shallow freeze covers every field. */
 function freeze<T>(o: T): T {
   Object.freeze(o);
   return o;
@@ -281,15 +273,20 @@ export function resolveCall(raw: ModelToolCall, env: ResolveEnv): ResolveOutcome
     case 'query_database': {
       const sql = asString(clean['sql']);
       if (sql === null) return fail(`sql must be a string; got ${describeType(clean['sql'])}`, tool);
-      const table = resolveTable(sql);
-      if (table === null) {
+      const query = parseSelect(sql);
+      if (query === null) {
         return fail(
           'could not resolve exactly one table from the query; refusing rather than ' +
             'authorising against a guessed resource',
           tool,
         );
       }
-      operation = freeze({ tool, table, statementClass: classifyStatement(sql), sql });
+      const supported = Object.hasOwn(TABLE_COLUMNS, query.table) ? TABLE_COLUMNS[query.table] : undefined;
+      if (!supported || (query.columns !== '*' && query.columns.some(c => !supported.includes(c)))) {
+        return fail('query names a table or column outside the fixture schema', tool);
+      }
+      operation = freeze({ tool, table: query.table, statementClass: 'select',
+        columns: query.columns === '*' ? '*' : query.columns.join(','), sql: query.sql });
       break;
     }
   }

@@ -3,3 +3,4 @@ dist/
 *.tsbuildinfo
 probe*.mjs
 run/
+experiments/hardening/runs/

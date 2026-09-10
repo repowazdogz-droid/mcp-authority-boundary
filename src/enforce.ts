@@ -5,7 +5,7 @@ import { executeTool, expectedEffectOf, observeEffect, effectsMatch, type ToolRe
 import type { EffectMediation, EffectMediator } from './mediation.js';
 import type { EntityStore, LoadedPolicy } from './policy.js';
 import { engineVersions } from './policy.js';
-import type { Ledger } from './ledger.js';
+import type { Ledger, UnchainedEntry } from './ledger.js';
 import type {
   CedarContext,
   Decision,
@@ -111,6 +111,11 @@ export class EnforcementPoint {
   }
 
   handle(raw: ModelToolCall): { entry: LedgerEntry; result: ToolResult | null } {
+    return this.cfg.ledger.exclusive(() => this.handleLocked(raw));
+  }
+
+  private handleLocked(raw: ModelToolCall): { entry: LedgerEntry; result: ToolResult | null } {
+    this.cfg.ledger.assertReady();
     const requestId = this.newRequestId();
     // both read once per decision, and recorded with the decision
     const now = this.cfg.now();
@@ -232,6 +237,11 @@ export class EnforcementPoint {
     // runs and from the operation alone.
     const authorizedEffect = expectedEffectOf(call.operation);
 
+    // Persist the exact allow before touching the fixture world. A crash or
+    // completion-write failure leaves an unresolved intent, never a clean run.
+    this.cfg.ledger.prepare(this.entryOf({ ...base, decision: outcome.decision,
+      mediation, result: null, authorizedEffect, observedEffect: null }));
+
     const result = executeTool(call.operation, outcome.grant, mediation);
 
     // What actually happened, read back out of the fixture world.
@@ -265,6 +275,11 @@ export class EnforcementPoint {
    * argument inductive rather than a convention.
    */
   handleDelegation(child: cedar.EntityJson): LedgerEntry {
+    return this.cfg.ledger.exclusive(() => this.delegateLocked(child));
+  }
+
+  private delegateLocked(child: cedar.EntityJson): LedgerEntry {
+    this.cfg.ledger.assertReady();
     const requestId = this.newRequestId();
     const now = this.cfg.now();
     const entities = this.cfg.entities();
@@ -303,7 +318,11 @@ export class EnforcementPoint {
   }
 
   private record(i: RecordInput): LedgerEntry {
-    return this.cfg.ledger.append({
+    return this.cfg.ledger.append(this.entryOf(i));
+  }
+
+  private entryOf(i: RecordInput): UnchainedEntry {
+    return {
       requestId: i.requestId,
       logicalTime: i.logicalTime,
       wallClock: this.cfg.wallClock,
@@ -328,6 +347,6 @@ export class EnforcementPoint {
       toolResult: i.result ? { ok: i.result.ok, summary: i.result.summary } : null,
       authorizedEffect: i.authorizedEffect,
       observedEffect: i.observedEffect,
-    });
+    };
   }
 }

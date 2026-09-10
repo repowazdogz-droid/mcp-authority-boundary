@@ -10,7 +10,10 @@ npm run verify
 ```
 
 Node 20.11 or newer. No API key, no network after `npm install`, no other toolchain. You
-should see 25 scenarios, four replay stages all reporting PASS, and 155 passing tests (121 per-call boundary, 34 containment).
+should see 25 scenarios, four replay stages all reporting PASS, and the passing regression
+suite. For the stronger experiment, also run `npm run test:formal` (Lean 4.33.1) and
+`npm run experiment:hardening` (Python 3/SQLite). `npm run verify:research` runs all three
+checks. See [the experiment guide](../experiments/hardening/README.md) for scope and artifacts.
 
 ## 1. Read the policy set first (5 minutes)
 

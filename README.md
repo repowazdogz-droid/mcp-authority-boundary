@@ -14,7 +14,14 @@ Authorization at an AI agent's tool boundary is usually treated as one property:
 
 The first version passed 66 tests, replayed as VERIFIED, and satisfied a checked complete-mediation invariant, while a 100,000-byte write executed under a 4,096-byte policy limit. The resolver measured the payload as a string and substituted zero bytes for a non-string; the executor coerced the same argument and wrote it. Both read the raw input independently, so the engine authorized a request that did not describe the operation.
 
-The repair binds execution to one validated immutable operation. Two unfixed counterexamples are retained, showing that enforcement correctness does not establish policy adequacy.
+The repair binds execution to one validated immutable operation. Later hardening closes the A2 delegation and A6 SQL defects, adds write-ahead logging and trace proofs, and tests real file effects with a separate observer. Permitted-but-harmful scenarios still show that enforcement correctness does not establish policy adequacy.
+
+## Current hardening experiment
+
+Run `npm test`, `npm run test:formal`, and `npm run experiment:hardening`.
+The [experiment guide](experiments/hardening/README.md) explains the controls and trust boundaries.
+[RESULTS.json](experiments/hardening/RESULTS.json) records the latest measured outcomes and source hashes.
+Historical tables below refer to their named commits; they are not measurements of the edited tree.
 
 ---
 
@@ -26,8 +33,8 @@ The point of this repository is that these are four claims, not one.
 |---|---|---|
 | **A** | **Mediation.** No mediated tool executes without an `allow`. | **Established** |
 | **B** | **Binding.** Execution consumes the same canonical operation Cedar authorized. | **Established.** Did not hold in v1. |
-| **C** | **Policy adequacy.** The policy expresses the authority its author intended. | **Not established, deliberately.** Two live counterexamples retained. |
-| **D** | **Effect verification.** The recorded effect matches the authorized operation. | **Not established by the shipped evidence.** Independent fixture read-back exists for `write_document` and `delete_file` only, and the ledger executes neither, so all eight of its stage-4 checks are record-consistency. The read-back is demonstrated for `write_document` in the test suite, and for `delete_file` nowhere — see [L7](docs/LIMITATIONS.md). |
+| **C** | **Policy adequacy.** The policy expresses the authority its author intended. | **Not established.** A2/A6 are fixed; authored tests do not establish intent. |
+| **D** | **Effect verification.** The recorded effect matches the authorized operation. | **Not established by the default scenario evidence.** Its eight effect checks remain record-consistency. The separate [hardening campaign](experiments/hardening/README.md) supplies real-file write/delete controls and injected failures, with a separate observer and explicit scope. |
 
 ### Correction to v1.0.0
 
@@ -138,7 +145,7 @@ The gate sits inside the server, in front of tool dispatch, rather than between 
 | Live-session expiry | never fired | witness exhibited | fires, no restart |
 | Revocation flipped on disk | ignored by a running process | witness exhibited | next decision denies |
 
-The three columns are the three tagged states of the repository, not the current head. At head the run is 25 scenarios, 27 ledger entries, 149 tests, four replay stages all PASS: scenario S24, `test/external-effect.test.ts` and `test/evidence-composition.test.ts` were added after the repair and change no earlier column.
+The three columns are tagged historical states. Subsequent additions and the current hardening experiment change no earlier column. Current counts belong to the generated reports and test output, not this historical table.
 
 Counts are over an authored scenario set written by the same person who wrote the policies. They describe this artifact and estimate nothing about attack prevalence, real-model behaviour, or any other policy set. The measurement frame is in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
@@ -153,15 +160,12 @@ Counts are over an authored scenario set written by the same person who wrote th
 ## What this does not establish
 
 - **Cedar correctness.** Every decision is as sound as `@cedar-policy/cedar-wasm` 4.12.0. Replay re-runs the same engine, so it cannot detect an engine fault.
-- **Policy adequacy.** Two counterexamples are retained on purpose, and they are why claim C is listed apart:
-  - **A2**: `forbid-widening-delegation` compares a session only to its immediate parent, so a faithful child of a widened parent inherits authority the root grant never had, and outlives it. The exact policy clause that would close it is written out in `docs/AUDIT.md`, unapplied.
-  - **A6**: `DELETE FROM analytics.metrics` is authorized by `permit-read-tier`, because `query_database` is classified read-only and the resolver binds a table without gating on statement class. The class is now recorded and visible in the evidence, and still not enforced.
-  - These are not unfinished work. An artifact whose every scenario is a catch would demonstrate the opposite of its own thesis.
+- **Policy adequacy.** The historical A2 and A6 witnesses now have regression fixes: both edges of an admitted depth-two delegation chain are checked, and database queries must parse as the supported read-only SELECT language. These fixes do not establish that policies express their author's intent. S18 and S24 remain permitted-but-harmful controls.
 - **Arbitrary real-world side effects.** No shell command runs, no mail is sent, no database is queried. Claim D is scoped to a fixture world with no symlinks, races, partial writes or permissions; for four of the six tools the recorded effect is derived from the operation rather than read back at all, and the two tools that do read back are never executed in the shipped ledger.
 - **The consequence of an authorized command.** Scenario S24 and the section below.
 - **Exhaustive adversarial coverage.** 25 authored scenarios and 32 audit and falsification probes bound the search, not the world. No counterexample found is not no counterexample.
 - **Production security.** There is no authentication. Session identity is bound from the environment at spawn.
-- **Faithful logging.** A hash chain proves the file was not edited after it was written. It cannot show that the file describes what happened: anything with code execution inside the server can write a consistent chain describing events that never occurred. Truncating the tail leaves a valid prefix, and there is a test asserting exactly that.
+- **Faithful logging.** Replay now reconciles write-ahead authorizations and completions, checks the end seal, and can use a verifier-held anchor. A co-located editable seal does not authenticate itself. A compromised host can fabricate records. The real-file campaign demonstrates both detected truncation and an extra write that only the independent observer catches.
 
 ---
 
@@ -232,9 +236,10 @@ auth-exec-binding    PASS   checked 25  n/a  2  failures 0
 effect-consistency   PASS   checked  8  n/a 19  failures 0
 ```
 
-then 155 passing tests. The stages are never collapsed into a single verdict, because a single verdict is what hid A1. Corrupting one recorded `observedEffect` turns effect-consistency red while auth-exec-binding stays green; corrupting one recorded `operation` does the reverse. [docs/QUICKSTART.md](docs/QUICKSTART.md) has the commands.
+then the passing regression suite. Stages are reported separately. Intent reconciliation and seal checks can now detect changes alongside the operation/effect stages. [docs/QUICKSTART.md](docs/QUICKSTART.md) has the commands.
 
-The ledger is byte-identical across runs, so `git status` stays clean after a fresh `./run.sh`.
+The ledger and intent journal are deterministic for a fixed source, policy and fixture version.
+Changing those inputs changes the evidence hashes; historical hashes must not be presented as current.
 
 ---
 

@@ -7,6 +7,9 @@
  */
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { snapshotDocuments, restoreDocuments, type WorldSnapshot } from '../../src/tools.js';
 import {
   attack,
@@ -35,7 +38,8 @@ afterEach(() => {
 });
 
 let n = 0;
-const ledgerPath = (): string => `run/acceptance-${n++}.jsonl`;
+const runDir = mkdtempSync(join(tmpdir(), 'mab-containment-'));
+const ledgerPath = (): string => join(runDir, `acceptance-${n++}.jsonl`);
 
 // ---------------------------------------------------------------------------
 

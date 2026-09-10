@@ -14,6 +14,9 @@
     "replay": "node dist/src/replay.js",
     "verify": "npm run build && node dist/src/demo.js && node dist/src/replay.js && npm run test:only && node scripts/screenshot.mjs",
     "test": "npm run build && npm run test:only",
+    "test:formal": "node scripts/check-formal.mjs",
+    "verify:research": "npm run verify && npm run test:formal && npm run experiment:hardening",
+    "experiment:hardening": "npm run build && node experiments/hardening/run.mjs",
     "clean": "rm -rf dist evidence",
     "screenshot": "node scripts/screenshot.mjs",
     "test:only": "node --test --test-concurrency=1 dist/test/*.test.js dist/containment/test/*.test.js"

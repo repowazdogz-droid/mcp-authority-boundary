@@ -176,7 +176,7 @@ evaluates directly. Narrowing is picking a descendant.
 Because every hop passes the same policy, the argument runs by induction: if every session
 in a chain was minted under this policy, the leaf's authority is contained in the root
 grant's. That is an argument about this policy set, exercised by
-`test/attenuation.test.ts`. It is **not** a machine-checked proof, and it has a stated
+`test/attenuation.test.ts`. This delegation argument is not mechanized and has a stated
 premise: that no session enters the store by any other route.
 
 That premise is load-bearing, so the artifact does not rely on it alone.

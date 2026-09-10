@@ -77,7 +77,7 @@ test('shell and database operations are classified as credential-bearing', () =>
   );
   assert.deepEqual(
     classifySinks(
-      { tool: 'query_database', table: 'crm.customers', statementClass: 'select', sql: 'select 1' },
+      { tool: 'query_database', table: 'crm.customers', statementClass: 'select', columns: '*', sql: 'select 1' },
       GRAPH,
       'a',
     ).map((x) => x.kind),

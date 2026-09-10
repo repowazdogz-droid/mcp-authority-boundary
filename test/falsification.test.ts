@@ -279,7 +279,7 @@ test('F6 the command that runs is the command that was authorized, byte for byte
   }
 });
 
-test('F6b statement classification is recorded (finding A6 remains OPEN on the policy side)', () => {
+test('F6b legacy classifier is diagnostic only; destructive SQL cannot execute', () => {
   assert.equal(classifyStatement('SELECT 1 FROM t'), 'select');
   assert.equal(classifyStatement('  \n select * from t'), 'select');
   assert.equal(classifyStatement('WITH x AS (SELECT 1) SELECT * FROM x'), 'select');
@@ -294,14 +294,10 @@ test('F6b statement classification is recorded (finding A6 remains OPEN on the p
       tool: 'query_database',
       args: { sql: 'DELETE FROM analytics.metrics WHERE 1=1' },
     });
-    // The class is now visible in the record and in the effect fingerprint...
-    assert.equal((entry.operation as { statementClass: string }).statementClass, 'mutating');
-    assert.match(entry.observedEffect?.detail ?? '', /statement class mutating/);
-    // ...but the policy still authorizes it as a read-only action. A6 is
-    // MITIGATED (recorded, checkable) and NOT CLOSED (not gated).
-    assert.equal(entry.cedarRequest.action.id, 'queryDatabase');
-    assert.equal(entry.decision.decision, 'allow');
-    assert.deepEqual(entry.decision.determiningPolicies, ['permit-read-tier']);
+    assert.equal(entry.operation, null);
+    assert.equal(entry.observedEffect, null);
+    assert.equal(entry.decision.decision, 'deny');
+    assert.equal(entry.decision.denialKind, 'unresolvable-resource');
   } finally {
     restore();
   }

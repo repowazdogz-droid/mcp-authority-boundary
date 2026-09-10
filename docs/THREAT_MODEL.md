@@ -47,12 +47,12 @@ The property under test, stated as the four separable claims the README lists:
 > read fixture state back after execution, and the other four tools derive the recorded effect
 > from the operation rather than observing it. The ledger executes neither read-back tool, so
 > every stage-4 check it contains is consistency of the record with itself. The read-back is
-> demonstrated for `write_document` in `test/external-effect.test.ts` and for `delete_file`
-> nowhere — see [LIMITATIONS.md](LIMITATIONS.md), L7.
+> demonstrated for `write_document` in `test/external-effect.test.ts`. A separate hardening
+> campaign now tests actual file writes and deletes with an observer process; its evidence
+> and assumptions are separate from the default ledger. See [HARDENING.md](HARDENING.md).
 >
-> **C (policy adequacy) is NOT claimed.** Findings A2 and A6 in `AUDIT.md` are live
-> counterexamples: the implementation is correct with respect to a policy that does not fully
-> express the intended authority.
+> **C (policy adequacy) is NOT claimed.** Historical findings A2 and A6 now have regression
+> fixes, but those fixes do not establish that the policy expresses its author's intent.
 
 Claim B did not hold before the adversarial audit; `docs/REPAIR.md` records what changed.
 

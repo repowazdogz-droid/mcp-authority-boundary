@@ -49,8 +49,22 @@ when {
   principal has delegatedFrom
   && !(principal.permission in principal.delegatedFrom.permission
        && principal.scope in principal.delegatedFrom.scope
+       && principal.notBefore >= principal.delegatedFrom.notBefore
        && principal.expiresAt <= principal.delegatedFrom.expiresAt
-       && principal.maxWriteBytes <= principal.delegatedFrom.maxWriteBytes)
+       && principal.maxWriteBytes <= principal.delegatedFrom.maxWriteBytes
+       && principal.depth == principal.delegatedFrom.depth + 1
+       // With a maximum depth of two, checking the parent's edge covers
+       // every admitted delegation edge, including a widened intermediate.
+       && (if principal.delegatedFrom has delegatedFrom then
+             principal.delegatedFrom.permission in principal.delegatedFrom.delegatedFrom.permission
+             && principal.delegatedFrom.scope in principal.delegatedFrom.delegatedFrom.scope
+             && principal.delegatedFrom.notBefore >= principal.delegatedFrom.delegatedFrom.notBefore
+             && principal.delegatedFrom.expiresAt <= principal.delegatedFrom.delegatedFrom.expiresAt
+             && principal.delegatedFrom.maxWriteBytes <= principal.delegatedFrom.delegatedFrom.maxWriteBytes
+             && principal.delegatedFrom.depth == principal.delegatedFrom.delegatedFrom.depth + 1
+             && principal.delegatedFrom.delegatedFrom.depth == 0
+             && !(principal.delegatedFrom.delegatedFrom has delegatedFrom)
+           else principal.delegatedFrom.depth == 0))
 };
 
 @id("forbid-revoked-ancestor")
@@ -61,7 +75,9 @@ forbid (
   resource
 )
 when {
-  principal has delegatedFrom && principal.delegatedFrom.revoked
+  principal has delegatedFrom &&
+    (principal.delegatedFrom.revoked ||
+      (principal.delegatedFrom has delegatedFrom && principal.delegatedFrom.delegatedFrom.revoked))
 };
 
 @id("forbid-excessive-delegation-depth")
@@ -72,5 +88,6 @@ forbid (
   resource
 )
 when {
-  principal.depth > 2
+  principal.depth > 2 || principal.depth < 0 ||
+    (!(principal has delegatedFrom) && principal.depth != 0)
 };

@@ -525,7 +525,7 @@ export const SCENARIOS: Scenario[] = [
     userPrompt: 'Read the public roadmap.',
     steps: [{ kind: 'tool', call: { tool: 'read_document', args: { path: 'corp/public/roadmap.md' } } }],
     expect: [
-      { decision: 'deny', denialKind: 'explicit-forbid', policies: ['forbid-excessive-delegation-depth'] },
+      { decision: 'deny', denialKind: 'explicit-forbid', policies: ['forbid-excessive-delegation-depth', 'forbid-widening-delegation'] },
     ],
   },
 

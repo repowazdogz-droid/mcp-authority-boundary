@@ -18,7 +18,7 @@
     "forbid-pii-table-below-admin": 1,
     "revoke-session-analyst-delegated": 1,
     "permit-delegate-attenuated": 1,
-    "forbid-widening-delegation": 1,
+    "forbid-widening-delegation": 2,
     "forbid-shell-on-production-host": 1,
     "permit-admin-tier": 2,
     "forbid-revoked-session": 1,

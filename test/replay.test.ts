@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
-import { GENESIS, entryHash, readLedger, verifyChain } from '../src/ledger.js';
+import { GENESIS, Ledger, entryHash, readLedger, verifyChain, verifySeal } from '../src/ledger.js';
 import { harness } from './helper.js';
 import type { LedgerEntry } from '../src/types.js';
 
@@ -79,4 +79,13 @@ test('a truncated final line does not silently pass', () => {
   // truncation of the tail leaves a valid prefix - which is exactly why the
   // chain alone cannot witness completeness. See docs/LIMITATIONS.md, L6.
   assert.ok(verifyChain(truncated).ok);
+});
+
+test('a sealed ledger detects tail truncation', () => {
+  const { path } = seed();
+  const ledger = new Ledger(path);
+  ledger.seal();
+  const raw = readFileSync(path, 'utf8').split('\n').filter(Boolean);
+  writeFileSync(path, raw.slice(0, -1).join('\n') + '\n');
+  assert.equal(verifySeal(path, readLedger(path)).ok, false);
 });

@@ -8,7 +8,7 @@
       "notApplicable": 0,
       "failures": 0,
       "verdict": "PASS",
-      "establishes": "the file has not been edited or reordered since it was written"
+      "establishes": "hash-chain consistency, agreement with the supplied end seal, and reconciliation of write-ahead intents. An untrusted co-located seal cannot authenticate history"
     },
     {
       "stage": "policy-replay",
@@ -37,5 +37,7 @@
   ],
   "findings": [],
   "verdict": "ALL STAGES PASS",
+  "anchor": "evidence/ledger.jsonl.seal.json",
+  "anchorTrust": "co-located, unauthenticated seal",
   "scope": "Stages 1-3 compare records to other records or re-derive them with code shared with the producer; they establish integrity and reproducibility, not correctness. Stage 4 is the only stage whose two sides come from different places, and even it compares a recorded world observation against a fresh derivation rather than re-observing the world, which is impossible after the fact."
 }

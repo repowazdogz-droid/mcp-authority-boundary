@@ -212,6 +212,7 @@ async function main(): Promise<void> {
   }
 
   const baseline = runUnmediatedBaseline();
+  new Ledger(LEDGER).seal();
   const entries = readLedger(LEDGER);
   // the universe is every policy across every version the run exercised
   const allPolicyIds = [
