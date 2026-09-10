@@ -106,3 +106,38 @@ write-ahead authorizations and completions, and can check a separately retained 
 The real-file campaign adds a separate observer process. Neither can establish reality
 against an adversary controlling the host and the verifier's reference artifacts. See
 [LIMITATIONS.md](LIMITATIONS.md), L6.
+
+## A11. Authorization is valid at decision time; a grant does not re-check policy
+
+Observed 2026-09-10 and pinned by `test/toctou-policy.test.ts`. A grant minted under an
+`allow` was consumed after each of three changes that would make the same request deny:
+(1) a forbid policy for the session was deployed (policy plane, `overlay-revocation`),
+(2) the session was revoked in the entity store (data plane, `revoked: true`), and (3) the
+clock moved past the session's `expiresAt`. In all three cases the execution **proceeded**.
+
+`consumeGrant` checks that the grant was issued by this process's PDP, is bound to the digest
+of the operation presented and to its mediation record, and is unspent. It consults neither
+the policy set, nor the entity store, nor the clock. The grant records the policy version it
+was decided under (`policyVersionSha`), so the version is inspectable afterwards, but nothing
+compares it to the current version at execution.
+
+The stated rule is therefore: **authorization is valid at decision time; grants do not
+re-check policy, revocation or expiry.** The converse rule would make the ledger's recorded
+decision no longer the decision that authorized the effect. The artifact keeps decision-time
+semantics and states it here rather than leaving it implicit.
+
+Where the window is. Through `EnforcementPoint.handle` the decision and the execution happen
+inside one ledger-exclusive call and no grant object is ever returned to a caller, so there is
+no caller-visible gap on that path. The window exists for callers of the split
+`Pdp.authorize` / `executeTool` API, which the tests and the hardening file-worker use. A
+deployment that needs revocation to reach an already-minted grant must bound how long a grant
+may be held before it is consumed; nothing in this artifact does so.
+
+## A12. Single-use is a per-process property
+
+`test/grant-race.test.ts` fires 100 concurrent consumers at one grant, 20 rounds; exactly one
+succeeds in every round (max 1, min 1). That result is what the runtime gives the code: Node
+runs JavaScript on one thread and `consumeGrant` has no `await`, so check-then-mark is one
+synchronous step. The code implements no lock. A grant is an in-process object tracked in a
+`WeakSet`; it cannot be serialised to another process or thread (a copy is refused as not
+issued), so there is no cross-process race to measure and no claim is made about one.
