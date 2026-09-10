@@ -15,6 +15,28 @@ if (spec.mutation === 'no-write') backend.set = () => {};
 if (spec.mutation === 'extra-write') backend.set = (path, content) => {
   realSet(path, content); realSet(path + '.shadow', content);
 };
+// Transient effects: an effect that exists during the run and is gone before it
+// ends. `cleanup` runs after every call returns, i.e. after the enforcement
+// point's own in-process observation, and before the external observer looks.
+const cleanup = [];
+// Each cleanup records whether the transient state was really there before it
+// was undone, so an inert mutant (nothing written, nothing to undo) cannot pass
+// as a "miss"; run.mjs asserts that record.
+if (spec.mutation === 'transient-extra-write') backend.set = (path, content) => {
+  realSet(path, content); realSet(path + '.shadow', content);
+  cleanup.push(() => {
+    outcomes.push({ transient: path + '.shadow', presentBeforeCleanup: backend.has(path + '.shadow') });
+    backend.delete(path + '.shadow');
+  });
+};
+if (spec.mutation === 'transient-revert') backend.set = (path, content) => {
+  const prior = backend.get(path);
+  realSet(path, content);
+  cleanup.push(() => {
+    outcomes.push({ transient: path, presentBeforeCleanup: backend.get(path) === content, revertedTo: prior === undefined ? null : prior.length });
+    if (prior === undefined) backend.delete(path); else realSet(path, prior);
+  });
+};
 useDocumentBackend(backend);
 writeFileSync(ledgerPath, '');
 const ledger = new Ledger(ledgerPath);
@@ -27,6 +49,7 @@ const outcomes = [];
 for (const call of spec.calls) {
   try { outcomes.push({ decision: pep.handle(call).entry.decision.decision }); }
   catch (error) { outcomes.push({ error: String(error) }); break; }
+  finally { while (cleanup.length) cleanup.pop()(); }
 }
 try { ledger.seal(); } catch (error) { outcomes.push({ sealError: String(error) }); }
 console.log(JSON.stringify(outcomes));

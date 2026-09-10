@@ -54,11 +54,24 @@ records in order. It does not infer an effect from file existence alone and does
 not use only the last ledger record. Unexpected files and missing effects count
 as divergences. Read errors and symlinks yield ERROR, never silent agreement.
 
-The 17 cases include multiple writes to the same and different targets; zero,
+The 19 cases include multiple writes to the same and different targets; zero,
 4095-, 4096- and 4097-byte payloads; a 100,000-character array; multibyte UTF-8;
 an allowed write followed by delete; wrong-target, no-write and extra-write
-mutants; preparation/completion I/O failures; D8 truncation; a rewritten local
-seal and truncated intent journal; and D7 rehashed mediation metadata.
+mutants; two transient-effect controls; preparation/completion I/O failures; D8
+truncation; a rewritten local seal and truncated intent journal; and D7 rehashed
+mediation metadata.
+
+The two transient controls measure the observation limit instead of asserting
+it. `transient-extra-write` writes the authorized file and an unauthorized
+`.shadow` file, then deletes the shadow before the run ends: every replay stage
+passes and the observer reports AGREE. That case is recorded as a known miss
+(`knownMiss` in RESULTS.json); it is the negative control to the extra-write
+positive control, which the observer catches because the shadow persists.
+`transient-revert` writes the authorized file and then restores its previous
+bytes: replay passes, and the observer reports DIVERGENCE, because it compares
+the final world against the baseline plus the completed records rather than
+against the baseline alone. A reverted recorded write is therefore not in the
+observer's blind spot; an unrecorded transient effect is.
 
 An additional filesystem control verifies that the adapter refuses a symlink
 and preserves the disposable outside target. The file adapter assumes the runner
@@ -84,8 +97,9 @@ execution and a reachable double-spend trace when the single-use premise is
 removed. The main proofs depend on standard `propext` and `Quot.sound`, with no
 `sorryAx` or custom axioms. Model-to-TypeScript refinement is not established.
 
-Final-state observation cannot detect a transient effect that is later undone,
-or count repeated writes of identical bytes. Write-ahead intents retain the
+Final-state observation cannot detect an unrecorded transient effect that is
+gone before the run ends (measured by `transient-extra-write`), and cannot count
+repeated writes of identical bytes. Write-ahead intents retain the
 authorized operation across a completion failure, but cannot establish whether
 an arbitrary external service committed. Stale locks require explicit recovery.
 Power-loss and directory-fsync durability are not established. All experiment

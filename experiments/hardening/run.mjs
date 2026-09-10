@@ -87,6 +87,19 @@ const specs = [
     replay: mutation === 'extra-write' ? 'ALL STAGES PASS' : mutation === 'prepare-failure' ? 'INCOMPLETE' : 'FAILED',
     world: ['shadow', 'extra-write', 'completion-failure'].includes(mutation) ? 'DIVERGENCE' : 'AGREE',
   })),
+  // Negative controls for the observation limit. The extra-write mutant above is
+  // the positive control (an unauthorized file that PERSISTS is caught). Here
+  // the same unauthorized file is written and removed before the run ends:
+  // every replay stage passes and the final-state observer reports AGREE. That
+  // is a declared, measured miss, not an assertion of the limit in prose.
+  { name: 'transient-extra-write', mutation: 'transient-extra-write', calls: [write(notes, 'new data')],
+    replay: 'ALL STAGES PASS', world: 'AGREE',
+    knownMiss: 'unauthorized transient file: written during the run, deleted before it ends; invisible to final-state observation' },
+  // Reverting the AUTHORIZED write is not a miss for this observer: it compares
+  // the final world against baseline plus completed records, so a recorded
+  // write whose bytes are gone is a mismatch.
+  { name: 'transient-revert', mutation: 'transient-revert', calls: [write(notes, 'new data')],
+    replay: 'ALL STAGES PASS', world: 'DIVERGENCE' },
   { name: 'D8-tail-loss', calls: [write(notes, 'first'), write(roadmap, 'second')], tamper: 'tail', replay: 'FAILED', world: 'DIVERGENCE' },
   { name: 'D8-resealed-prefix', calls: [write(notes, 'first'), write(roadmap, 'second')], tamper: 'reseal', replay: 'FAILED', world: 'DIVERGENCE' },
   { name: 'D7-rehashed-mediation', calls: [write(notes, 'first')], tamper: 'mediation', replay: 'FAILED', world: 'AGREE' },
@@ -103,6 +116,9 @@ for (const spec of specs) {
   save(caseFile, spec);
   const outcomes = node('file-worker.mjs', [root, ledger, caseFile]);
   save(join(directory, 'worker.json'), outcomes);
+  if (spec.mutation?.startsWith('transient')) {
+    assert.ok(outcomes.some(o => o.presentBeforeCleanup === true), `${spec.name}: transient effect never existed`);
+  }
   const anchor = join(directory, 'verifier-held-anchor.json');
   const hasSeal = !outcomes.some(x => x.sealError);
   if (hasSeal) copyFileSync(sealPath(ledger), anchor);
@@ -131,6 +147,7 @@ for (const spec of specs) {
   assert.equal(verification.verdict, spec.replay, spec.name);
   assert.equal(observation.verdict, spec.world, spec.name);
   fileResults.push({ name: spec.name, replay: verification.verdict, observer: observation.verdict,
+    ...(spec.knownMiss ? { knownMiss: spec.knownMiss } : {}),
     outcomes, findings: verification.findings.map(f => f.detail) });
 }
 
@@ -146,18 +163,19 @@ assert.equal(readFileSync(outside, 'utf8'), 'unchanged');
 
 const sourceFiles = [];
 for (const directory of ['src', 'test', 'scripts', 'formal', 'policies', 'policies/overlay-revocation',
-  'containment/src', 'containment/test', 'experiments/hardening']) {
+  'containment/src', 'containment/test', 'experiments/hardening', 'experiments/independent-observer']) {
   for (const name of readdirSync(join(repo, directory))) {
-    if (/\.(ts|mjs|py|lean|cedar|cedarschema)$/.test(name)) sourceFiles.push(join(directory, name));
+    if (/\.(ts|mjs|py|lean|cedar|cedarschema|sh)$/.test(name)) sourceFiles.push(join(directory, name));
   }
 }
-sourceFiles.push('package.json', 'package-lock.json', 'entities/entities.json', 'formal/lean-toolchain');
+sourceFiles.push('package.json', 'package-lock.json', 'entities/entities.json', 'formal/lean-toolchain',
+  'formal/vectors.json', 'docs/REPAIR.md', 'docs/THREAT_MODEL.md');
 const sourceHashes = Object.fromEntries(sourceFiles.sort().map(p => [p, hash(readFileSync(join(repo, p)))]));
 const report = { generatedAt: new Date().toISOString(), output, node: process.version,
   platform: process.platform, gitHead: run('git', ['rev-parse', 'HEAD']).trim(), sourceHashes,
   sql: sqlReport, files: fileResults, symlinkControl: 'PASS',
   scope: 'local experiment with real files, separate observer process and controller-held pre-tamper anchor; shared host and author; no cryptographic machine independence',
-  limitations: ['final-state observation misses transient/reverted effects',
+  limitations: ['final-state observation misses transient effects outside the record (measured: transient-extra-write); a reverted recorded write is caught (measured: transient-revert)',
     'file adapter assumes the experiment owner controls directory topology during execution',
     'write-ahead logging records authorization; it cannot make arbitrary external effects transactional',
     'SQL oracle covers the accepted subset on this SQLite build'] };
