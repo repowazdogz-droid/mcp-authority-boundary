@@ -1,5 +1,7 @@
 # mcp-authority-boundary
 
+**Reproduce every talk figure: [VERIFY.md](VERIFY.md).**
+
 **Correct mediation is not sufficient: separating enforcement, authorization-execution binding, and policy adequacy at the MCP tool boundary.**
 
 Every test passed. The replay verifier said VERIFIED. The mediation invariant held. And a 100,000-byte write went through a policy that capped writes at 4,096 bytes.
