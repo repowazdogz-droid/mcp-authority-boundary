@@ -125,7 +125,9 @@ Expected machine-generated table:
 
 That table is the slide when the roles run on separate hosts: the counterexample is
 then stated by a process that shares no code with the program under investigation.
-This repository records only the single-host `run-all-local.sh` run.
+This repository records only single-host `run-all-local.sh` runs: the author's machine, and the
+`counterexample` job of GitHub Actions run 34483375841 (GitHub-hosted runner, commit `3ccac8a`).
+No run with the roles on separate hosts is recorded.
 
 ## 4. Teardown (SUT host)
 

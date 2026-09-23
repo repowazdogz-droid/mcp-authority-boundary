@@ -1,13 +1,18 @@
-# Verify every talk figure in about a minute
+# Verify every figure in about a minute
 
 Expected lines below are the ones observed on 2026-09-10 (macOS, Node 26.8.1) at
 commit `4e1f074` of branch `hardening-2026-09-10`; they are also what CI prints
-(`.github/workflows/verify.yml`). Needs Node 20.11+, git, Python 3 with sqlite3. The clone must not be shallow:
+(`.github/workflows/verify.yml`). On 2026-09-23, from a fresh clone of the public repository at
+`3ccac8a` (tag `newcastle-2026-09-11`, macOS, Node 26.8.1), these were re-observed identically:
+the `npm test` counts, the hardening summary (`sqlCases 240, fileCases 19, passed`, with the
+`knownMiss` control), the manifest digest, the `test:formal` and `test:conformance` lines, and
+the counterexample table and hashes. The benchmark was not re-run. Needs Node 20.11+, git, Python 3 with sqlite3. The clone must not be shallow:
 two tests rebuild `631196d` from history (a `fetch-depth: 1` checkout fails them).
 
 ```bash
-git clone -b hardening-2026-09-10 https://github.com/repowazdogz-droid/mcp-authority-boundary.git
+git clone https://github.com/repowazdogz-droid/mcp-authority-boundary.git
 cd mcp-authority-boundary && npm ci
+# frozen state these figures were first recorded at: git checkout newcastle-2026-09-11
 ```
 
 | Command | Expected output line |
@@ -37,7 +42,10 @@ Expected: the two-row table, and in the observer line for v1
 
 The two frozen commits: `631196d` is v1, 66 tests green, replay VERIFIED, and the
 100,000-byte write executes under a 4,096-byte cap. `7b7e973` is the repaired base
-of this branch, 155 tests green, and the same call is refused before Cedar. The single-
-host run above is the only run this repository records; `npm test` also proves the
+of this state, 155 tests green at that commit, and the same call is refused before Cedar.
+The counterexample has been run on the author's machine and in GitHub Actions run
+[34483375841](https://github.com/repowazdogz-droid/mcp-authority-boundary/actions/runs/34483375841)
+(GitHub-hosted Ubuntu runner, commit `3ccac8a`, same effect and observer sha256). In both,
+all three roles ran on one host; no three-host run is recorded. `npm test` also checks that the
 harness export the observer reads is byte-identical to v1's in-memory effect
 (`test/observer-export.test.ts`).

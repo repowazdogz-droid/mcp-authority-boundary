@@ -11,7 +11,7 @@
 name: verify
 on:
   push:
-    branches: ['hardening-*']
+    branches: ['main', 'hardening-*']
   workflow_dispatch:
 
 jobs:
