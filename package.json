@@ -1,6 +1,6 @@
 {
   "name": "mcp-authority-boundary",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "Research artifact separating three properties of agent authorization: complete mediation, authorization-execution binding, and policy adequacy. Cedar-enforced MCP tool boundary, adversarially falsified and repaired.",
   "license": "Apache-2.0",
   "type": "module",

@@ -1,10 +1,55 @@
 # mcp-authority-boundary
 
+An MCP tool server can pass every test and replay its ledger as VERIFIED while a 100,000-byte write executes under a 4,096-byte policy cap.
+
+[![CI](https://img.shields.io/github/actions/workflow/status/repowazdogz-droid/mcp-authority-boundary/verify.yml?branch=main&label=CI)](https://github.com/repowazdogz-droid/mcp-authority-boundary/actions/workflows/verify.yml)
+[![Release](https://img.shields.io/github/v/release/repowazdogz-droid/mcp-authority-boundary)](https://github.com/repowazdogz-droid/mcp-authority-boundary/releases)
+
+## Try it
+
+Needs Node 20.11+, git, and network for `npm ci`. This builds the two frozen versions (v1 `631196d` and the repaired `7b7e973`) and sends both the same malformed `write_document` call:
+
+```bash
+git clone https://github.com/repowazdogz-droid/mcp-authority-boundary.git
+cd mcp-authority-boundary
+W=$(mktemp -d)
+git worktree add -q "$W/v1" 631196d && (cd "$W/v1" && npm ci --silent && npm run --silent build)
+git worktree add -q "$W/head" 7b7e973 && (cd "$W/head" && npm ci --silent && npm run --silent build)
+bash experiments/independent-observer/run-all-local.sh "$W" | tail -5
+```
+
+Expected:
+
+```
+| Version | Cedar | Ledger / replay | Independent world observer |
+|---|---|---|---|
+| v1 (631196d) | ALLOW (byteLen=0) | VERIFIED (decision=allow, wrote 100000 bytes to corp/public/notes.md) | 100000 bytes written (sha256 d69e689881578332...) vs 0 authorized -> DIVERGENCE |
+| head (7b7e973) | REFUSE (unresolvable-resource; never reached Cedar as an allow) | INCOMPLETE (nothing executed, nothing to check) (decision=deny) | no write (refused: unresolvable-resource) |
+```
+
+On 2026-10-16 (MacBook, Darwin arm64, Node 26.8.1), from a fresh clone, the commands after `git clone` took 5.0 s with a warm npm cache and 6.8 s with an empty one, exit code 0. Clone time is not included. The full regression suite is `npm ci && npm test`, which ends with `ℹ tests 183`, `ℹ pass 183`, `ℹ fail 0` (13 s on the same machine). [VERIFY.md](VERIFY.md) lists the expected output of every other command.
+
+## What this does not show
+
+- **Observer independence is in imports, not in custody.** The harness exports v1's in-memory effect to disk, and the observer reads that export. `test/observer-export.test.ts` checks that the two are byte-identical, but a process that controls the harness controls the export.
+- **The observer reads final state.** A write that happens and is then reverted before observation is missed. The hardening campaign keeps this as a labelled negative control (`transient-extra-write`, `knownMiss`).
+- **The scope is one MCP tool-call boundary in one server with one authored policy set.** Nothing here tests GUI or computer-use agents, other policy engines, or how often this occurs in other codebases.
+- **The failure class is not new.** Two components interpreting the same input differently is a long-known class (for example MITRE CWE-436, *Interpretation Conflict*). What this repository offers is a small executable instance at an agent tool boundary, with the evidence that separates the internal signals from the observed effect. It does not claim a new vulnerability class.
+- **Cedar correctness.** Replay re-runs the same engine (`@cedar-policy/cedar-wasm` 4.12.0), so it cannot detect an engine fault. Nothing here shows Cedar evaluating a policy incorrectly.
+- **Policy adequacy (claim C).** Authored tests do not establish that the policies express their author's intent. S18 and S24 remain permitted-but-harmful controls.
+- **Effect verification (claim D) in the default scenarios.** Their eight effect checks are record-consistency. Real-file effects are tested only in the separate hardening campaign, within its stated scope.
+- **That the TypeScript refines the Lean model.** `formal/Conformance.lean` checks 39 recorded traces against `formal/Boundary.lean`. That is a trace check over the runs taken, not a refinement proof.
+- **A multi-host run.** In every recorded run the input source, the system under test and the observer ran on one host. The three-host procedure is documented, not run.
+- **Production security.** There is no authentication. Whoever launches the server chooses the session identity.
+- The full list is [docs/LIMITATIONS.md](docs/LIMITATIONS.md) (L1–L11) and [What this does not establish](#what-this-does-not-establish) below.
+
+---
+
 **Correct mediation is not sufficient: separating enforcement, authorization-execution binding, and policy adequacy at the MCP tool boundary.**
 
 Every test passed. The replay verifier said VERIFIED. The mediation invariant held. And a 100,000-byte write went through a policy that capped writes at 4,096 bytes.
 
-That is not a story about a bug. It is the artifact's result. Authorization assurance has layers that fail independently, and the usual green signals cannot tell them apart.
+This is the artifact's result, and it is not a bug report. Authorization assurance has layers that fail independently, and the usual green signals cannot tell them apart.
 
 ---
 
@@ -24,14 +69,6 @@ One `write_document` call whose `content` argument is a one-element array holdin
 - **Reproduce.** See [VERIFY.md](VERIFY.md). Building the two frozen versions needs network access for `npm ci`; the comparison itself runs offline in seconds.
 - **Where it has been reproduced.** On the author's MacBook (2026-09-10, and on 2026-09-23 from a fresh clone of the public repository at `3ccac8a`), and in [GitHub Actions run 34483375841](https://github.com/repowazdogz-droid/mcp-authority-boundary/actions/runs/34483375841) on a GitHub-hosted Ubuntu runner at `3ccac8a`. All three runs produced the same effect sha256 and the same observer sha256. In each run, all three roles (input source, system under test, observer) ran on a single host. The three-host procedure is documented but no run of it is recorded here.
 - **Formal status.** `formal/Boundary.lean` proves, for an abstract transition system, that every reachable execution has a grant whose request is derived from the operation and allowed, and that a grant executes at most once. Removing the single-use premise yields a double-spend trace. A further theorem checks only the arithmetic behind the v1 witness: the size budget admits a 0-byte request and rejects a 100,000-byte one. The file prints axiom reports for these five theorems, and they list only `propext` and `Quot.sound`, with no `sorryAx`. `formal/Conformance.lean` checks recorded TypeScript traces against that model (39 traces). **This is a trace check, not a refinement proof.** Nothing establishes that every execution of the TypeScript implementation is a model transition.
-
-### Limits to read before citing the witness
-
-- **Observer independence is in imports, not in custody.** The harness exports v1's in-memory effect to disk, and the observer reads that export. `test/observer-export.test.ts` checks that the two are byte-identical, but a process that controls the harness controls the export.
-- **The observer reads final state.** A write that happens and is then reverted before observation is missed. The hardening campaign keeps this as a labelled negative control (`transient-extra-write`, `knownMiss`).
-- **The scope is one MCP tool-call boundary in one server with one authored policy set.** Nothing here tests GUI or computer-use agents, other policy engines, or how often this occurs in other codebases.
-- **The failure class is not new.** Two components interpreting the same input differently is a long-known class (for example MITRE CWE-436, *Interpretation Conflict*). What this repository offers is a small executable instance at an agent tool boundary, with the evidence that separates the internal signals from the observed effect. It does not claim a new vulnerability class.
-- The full list is [docs/LIMITATIONS.md](docs/LIMITATIONS.md) (L1–L11).
 
 ---
 
@@ -85,7 +122,7 @@ Claims A, B, C and D are unaffected. Corrected 2026-08-17. 155/155 tests pass, i
 
 ---
 
-A held in v1 and B did not, which is the whole finding: **the gate can be perfectly enforced and still authorize the wrong thing.** A and B holding says nothing about C, and says nothing about what an authorized command does outside this boundary — scenario S24, and the section below.
+A held in v1 and B did not, which is the whole finding: **the gate can be perfectly enforced and still authorize the wrong thing.** A and B holding says nothing about C, and says nothing about what an authorized command does outside this boundary: scenario S24, and the section below.
 
 ---
 
@@ -207,13 +244,13 @@ reason S18 is: it marks where the claims stop.
 
 `execute_shell` is authorized on a non-production host by `permit-admin-tier`. The command
 string denotes a consequence outside this boundary. `cedarRequestFromOperation` maps
-`execute_shell` to `(action, Mcp::Host, byteLen 0, recipientDomain "")` — the command is not a
+`execute_shell` to `(action, Mcp::Host, byteLen 0, recipientDomain "")`. The command is not a
 field Cedar receives, so the Cedar request for that call is *identical* to the request for a
 benign command on the same host, and no policy in this set, present or future, can be written
 against the difference. `test/external-effect.test.ts` asserts that identity, asserts that both
 calls draw the same verdict from the real PDP, and asserts that claims A and B hold throughout:
 nothing ran without an `allow`, and execution consumed the operation the grant was minted for.
-The operation digests differ, so binding does separate the two calls — it binds execution to
+The operation digests differ, so binding does separate the two calls: it binds execution to
 the authorized operation, and the authorized operation is the one whose consequence is
 unrepresented.
 
@@ -224,21 +261,21 @@ resolved. What S24 exhibits is the representation gap, not an effect.
 **The underlying limitation is prior work, and none of it is claimed here.** An enforcement
 mechanism cannot constrain what it can neither observe nor control:
 
-- **Schneider**, *Enforceable Security Policies*, TISSEC 3(1), 2000 — execution monitors
+- **Schneider**, *Enforceable Security Policies*, TISSEC 3(1), 2000: execution monitors
   enforce only safety properties. The biconditional is not his: he states that "the converse —
   that all safety properties have EM enforcement mechanisms — does not hold".
 - **Basin, Jugé, Klaedtke & Zălinescu**, *Enforceable Security Policies Revisited*, POST 2012 /
-  TISSEC 16(1), 2013 — partitions actions into controllable and only-observable, and
+  TISSEC 16(1), 2013: partitions actions into controllable and only-observable, and
   characterises enforceability as `(U,O)`-safety: informally, "P is safety in U and bad things
   are not caused by an only-observable action". The command's consequence is such an action for
   this boundary.
 - **Khoury & Hallé**, *Runtime Enforcement With Partial Control*, FPS 2015
-  ([arXiv:1508.06525](https://arxiv.org/abs/1508.06525)) — generalises that partition to a
+  ([arXiv:1508.06525](https://arxiv.org/abs/1508.06525)): generalises that partition to a
   lattice of control levels, with file and network operations as the worked examples, and shows
   the enforceable set grows monotonically as an action is moved to a level the monitor
   controls. Adding a lower-layer enforcement point is that move.
 - **Ray**, *What Can Be Enforced? A Theory of Certified Runtime Safety for Tool-Using Agents*,
-  2026 ([arXiv:2607.22868](https://arxiv.org/abs/2607.22868)) — the same characterisation for a
+  2026 ([arXiv:2607.22868](https://arxiv.org/abs/2607.22868)): the same characterisation for a
   pre-execution gate on agent tool calls, relative to a fixed vector of oracle predicates: what
   the gate cannot see, it cannot enforce.
 
@@ -283,7 +320,7 @@ policies/          Cedar schema, 14 base policies plus a 1-policy revocation
 entities/          sessions, scopes, documents, mailboxes, tables, hosts
 src/               ~2500 lines of code. resolve.ts is the correspondence layer
                    and the place A1 lived; mediation.ts holds the grant machinery.
-test/              the regression suite (182 tests at 3ccac8a; run `npm test`), including 17 audit probes (the original 14
+test/              the regression suite (183 tests at v1.1.1; run `npm test`), including 17 audit probes (the original 14
                    witnesses, several now split into before/after pairs), a
                    15-probe post-repair falsification sweep,
                    external-effect.test.ts, which pins the S24 boundary, and

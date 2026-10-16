@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+type: software
+title: mcp-authority-boundary
+abstract: "An MCP tool server can pass every test and replay its ledger as VERIFIED while a 100,000-byte write executes under a 4,096-byte policy cap."
+authors:
+  - family-names: Smith
+    given-names: Warren
+version: 1.1.1
+license: Apache-2.0
+repository-code: "https://github.com/repowazdogz-droid/mcp-authority-boundary"
+keywords:
+  - mcp
+  - cedar
+  - authorization
+  - llm-agents
+  - security-research
+  - research-artifact
