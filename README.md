@@ -15,7 +15,7 @@ cd mcp-authority-boundary
 W=$(mktemp -d)
 git worktree add -q "$W/v1" 631196d && (cd "$W/v1" && npm ci --silent && npm run --silent build)
 git worktree add -q "$W/head" 7b7e973 && (cd "$W/head" && npm ci --silent && npm run --silent build)
-bash experiments/independent-observer/run-all-local.sh "$W" | tail -4
+bash experiments/independent-observer/run-all-local.sh "$W" | tail -5
 ```
 
 Expected:
@@ -27,7 +27,7 @@ Expected:
 | head (7b7e973) | REFUSE (unresolvable-resource; never reached Cedar as an allow) | INCOMPLETE (nothing executed, nothing to check) (decision=deny) | no write (refused: unresolvable-resource) |
 ```
 
-On 2026-10-16 (MacBook, Darwin arm64, Node 26.8.1), from a fresh clone, the commands after `git clone` took 4.6 s with a warm npm cache and 5.9 s with an empty one, exit code 0. Clone time is not included. The full regression suite is `npm ci && npm test`, which ends with `ℹ tests 183`, `ℹ pass 183`, `ℹ fail 0` (13 s on the same machine). [VERIFY.md](VERIFY.md) lists the expected output of every other command.
+On 2026-10-16 (MacBook, Darwin arm64, Node 26.8.1), from a fresh clone, the commands after `git clone` took 5.0 s with a warm npm cache and 6.8 s with an empty one, exit code 0. Clone time is not included. The full regression suite is `npm ci && npm test`, which ends with `ℹ tests 183`, `ℹ pass 183`, `ℹ fail 0` (13 s on the same machine). [VERIFY.md](VERIFY.md) lists the expected output of every other command.
 
 ## What this does not show
 
