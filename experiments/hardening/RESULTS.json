@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-10T13:08:43.850Z",
-  "output": "/Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-Qn4aiJ",
+  "generatedAt": "2026-10-16T12:58:33.632Z",
+  "output": "/Users/warre/audit/mcp-authority-boundary/experiments/hardening/runs/run-AoNY9B",
   "node": "v26.8.1",
   "platform": "darwin",
-  "gitHead": "4e1f07449e5932160c9b43ef1e721d6710cb679f",
+  "gitHead": "b5276f3b90924a08f8243fd0f46348ba42ed0020",
   "sourceHashes": {
     "containment/src/deployments.ts": "b5f370987cbc81f2f63d79e6ff981b54379c096c67544dc8f2f6594de30be935",
     "containment/src/fixture.ts": "b9ae9550078fd1d37d60223bdc3664142d5f14020a507c862e5d73584c7626e3",
@@ -29,8 +29,8 @@
     "formal/Conformance.lean": "30a9eef2e5adf26934db6532458013068c73de8322351f6c602a4ad74852a381",
     "formal/lean-toolchain": "3aac669c7a910ec2389f4e4f921b605adf6ebf2d1e0c9b9cd0be4d33f3f5db71",
     "formal/vectors.json": "94373db6ed1fc42317c5121fe07c717c5b4cdba1cdd773631d2e3f80bb92e820",
-    "package-lock.json": "6a706e469ae7ecddeaeba4eb71529b334c6bec11473e74dd9751933e89e30104",
-    "package.json": "1d30ff12bb92dbd777bcee428f4c8ae74cbf2b19fb6cc2a9cceb05ac0dfb76b9",
+    "package-lock.json": "b5a826062527b88bba004ec7f76ebdf82eceecd55a49b2fc22eb8905fa580254",
+    "package.json": "0d20fcaba9589b3f567eeb801e5ea8229269de61e9e9ae090a62a2f2fccb80c6",
     "policies/00-least-privilege.cedar": "3b3a59c31fc84dd5138cce41a6fba82097bf8234855a03f7f7fe6faa103b9694",
     "policies/10-delegation.cedar": "28ffed69a57f9bb4a22b0914867b2b574f6e896e6ac30a5ec4a33575d78d060c",
     "policies/20-guardrails.cedar": "ccd8a9a055387ed747edde5a98c7b1b2ca8765feb52bfed8c971766676905b92",
@@ -62,6 +62,7 @@
     "src/types.ts": "c065f583c1252ba75ee6091d072f69d8cf9026fa9488451256b152177c7253f0",
     "test/adversarial.test.ts": "fb74041824071a9f7061d98a3d2b60643d14292fd0070f8234ed21910eb6aa5e",
     "test/attenuation.test.ts": "5ae348624e4d2a9cd71fe859fa82e7b0dbc27cc9e7bedbca89c0452a7830dadb",
+    "test/ci-can-fail.test.ts": "0ff3401339b102bda4b87e01d8c9468bb5289f06b678daf0d29ae5dd8a066b9e",
     "test/evidence-composition.test.ts": "f561cd9b2c451d407802d789b7b3e9b884148749df9e4d819bf1243462df2ddc",
     "test/external-effect.test.ts": "03fbc3bfe6bb74fdcd7d56d4946a0ab8ec3f2a695c736e3d6d8245db2b929399",
     "test/failclosed.test.ts": "aa68242fcf94ff84b2a205e41ca97eddcb32121adb9c615285b19e85acc5791f",
@@ -243,7 +244,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-Qn4aiJ/shadow/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/audit/mcp-authority-boundary/experiments/hardening/runs/run-AoNY9B/shadow/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -262,7 +263,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-Qn4aiJ/no-write/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/audit/mcp-authority-boundary/experiments/hardening/runs/run-AoNY9B/no-write/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
@@ -294,7 +295,7 @@
         }
       ],
       "findings": [
-        "missing ledger seal /Users/warre/mcp-authority-boundary/experiments/hardening/runs/run-Qn4aiJ/completion-failure/ledger.jsonl.seal.json",
+        "missing ledger seal /Users/warre/audit/mcp-authority-boundary/experiments/hardening/runs/run-AoNY9B/completion-failure/ledger.jsonl.seal.json",
         "unresolved execution intent sess-writer-delegated@0#0: outcome unknown"
       ]
     },
