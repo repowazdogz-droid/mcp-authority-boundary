@@ -1,8 +1,8 @@
 # Changelog
 
-Dates are tag dates. A GitHub release exists for v1.0.0 only; v1.1.0 is a git tag without a release.
+Dates are tag dates. v1.1.0 is a git tag without a GitHub release.
 
-## 1.1.1 (not yet tagged)
+## 1.1.1 (2026-10-16)
 
 - **CI could report a failing suite as green.** `verify.yml` piped `npm test`, the hardening campaign and the observer run into `tee` under GitHub's implicit shell (`bash -e`, no `pipefail`), so each step exited with `tee`'s status. An explicit `shell: bash` default now runs every step under `bash -eo pipefail`.
 - **Negative control for that fix.** `test/ci-can-fail.test.ts` fails only when `CI_NEGATIVE_CONTROL=1`. A new CI step runs it through the same `tee` pipe and requires a non-zero exit with exactly one failure. In normal runs the test passes and asserts nothing about the system. `npm test` now reports 183 tests (182 at v1.1.0).
