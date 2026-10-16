@@ -14,6 +14,14 @@ on:
     branches: ['main', 'hardening-*']
   workflow_dispatch:
 
+# An explicit `shell: bash` makes GitHub run `bash --noprofile --norc -eo pipefail {0}`.
+# The implicit default is `bash -e {0}` with no pipefail, under which `npm test | tee`
+# exits with tee's status and a failing suite reported green. The negative-control step
+# in `implementation` proves this setting is in force.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   implementation:
     runs-on: ubuntu-latest
@@ -32,6 +40,20 @@ jobs:
         run: |
           npm test 2>&1 | tee /tmp/npm-test.log
           echo "--- summary"; grep -E '^ℹ (tests|pass|fail)' /tmp/npm-test.log
+      - name: negative control (the npm test step above must be able to go red)
+        # Same pipe-into-tee shape as the npm test step. With pipefail the deliberate
+        # failure in test/ci-can-fail.test.ts reaches the `if`; without it tee's exit 0
+        # wins and this step fails. The greps check it failed for that reason and only that.
+        env:
+          CI_NEGATIVE_CONTROL: '1'
+        run: |
+          if npm run test:only 2>&1 | tee /tmp/negative-control.log; then
+            echo "FAIL: suite exited 0 with CI_NEGATIVE_CONTROL=1; a failing npm test cannot turn this job red"
+            exit 1
+          fi
+          grep -F 'deliberate failure: CI_NEGATIVE_CONTROL=1' /tmp/negative-control.log
+          grep -E '^ℹ fail 1$' /tmp/negative-control.log
+          echo "ok: the deliberate failure propagated through the tee pipe"
       - name: default scenario demo and replay (the pre-hardening checks, kept)
         run: |
           node dist/src/demo.js | tail -3
